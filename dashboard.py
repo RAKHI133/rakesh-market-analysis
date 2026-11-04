@@ -150,8 +150,9 @@ def fetch_nse_fii_dii():
     session = requests.Session()
     session.headers.update({"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
         "Accept":"application/json, text/plain, */*","Referer":"https://www.nseindia.com/reports/fii-dii"})
-    session.get("https://www.nseindia.com/", timeout=15)
-    response = session.get("https://www.nseindia.com/api/fiidiiTradeReact", timeout=20)
+    # Keep NSE requests short so a blocked endpoint cannot stall the whole dashboard.
+    session.get("https://www.nseindia.com/", timeout=4)
+    response = session.get("https://www.nseindia.com/api/fiidiiTradeReact", timeout=6)
     response.raise_for_status()
     payload = response.json()
     if isinstance(payload, dict):
@@ -204,35 +205,44 @@ def fetch_fii_dii():
 with tabs[3]:
     st.subheader("FII / DII tracker · NSE")
     st.markdown("[Open NSE official FII/DII report](https://www.nseindia.com/reports/fii-dii)")
-    st.caption("Data is fetched only from the NSE FII/DII report API. Daily cash-market data is generally published after market close and may be revised.")
-    data, error = fetch_fii_dii()
-    if data.empty:
-        st.error("NSE FII/DII data is currently unavailable.")
-        st.caption(f"NSE error: {error}")
-        st.info("Open the official NSE report link above to check the latest published figures. No values are fabricated.")
-    else:
-        sessions = st.selectbox("History to display", [5, 10, 20], index=0, format_func=lambda x: f"Last {x} trading sessions")
-        history = data.head(sessions).copy().sort_values("date_sort")
-        latest = data.iloc[0]
-        a,b = st.columns(2)
-        a.metric("Latest FII/FPI net (₹ crore)", f"{latest.fii_net:,.2f}")
-        b.metric("Latest DII net (₹ crore)", f"{latest.dii_net:,.2f}")
-        st.caption(f"Source: NSE · Latest available date: {latest.date_sort:%d %b %Y} · {len(history)} trading sessions displayed")
-        totals = history[["fii_buy","fii_sell","fii_net","dii_buy","dii_sell","dii_net"]].sum()
-        c1,c2,c3 = st.columns(3)
-        c1.metric(f"FII net · {len(history)} sessions", f"₹{totals.fii_net:,.2f} Cr")
-        c2.metric(f"DII net · {len(history)} sessions", f"₹{totals.dii_net:,.2f} Cr")
-        c3.metric("Combined net", f"₹{totals.fii_net + totals.dii_net:,.2f} Cr")
-        trend = history.set_index("date_sort")[["fii_net","dii_net"]].rename(columns={"fii_net":"FII/FPI net","dii_net":"DII net"})
-        st.line_chart(trend, use_container_width=True)
-        table = history[["date","fii_buy","fii_sell","fii_net","dii_buy","dii_sell","dii_net"]].rename(columns={
-            "date":"Date","fii_buy":"FII Buy (₹ Cr)","fii_sell":"FII Sell (₹ Cr)","fii_net":"FII Net (₹ Cr)",
-            "dii_buy":"DII Buy (₹ Cr)","dii_sell":"DII Sell (₹ Cr)","dii_net":"DII Net (₹ Cr)"
-        })
-        st.dataframe(table.sort_values("Date", ascending=False), use_container_width=True, hide_index=True)
-        st.download_button("Download FII/DII CSV", table.to_csv(index=False), "fii_dii_history.csv", "text/csv")
-        if len(history) < sessions:
-            st.info(f"NSE returned {len(history)} daily records. No missing sessions are invented.")
+    st.caption("NSE-only daily cash-market data. This is separate from live intraday prices and is generally published after market close.")
+    if "fii_dii_data" not in st.session_state:
+        st.info("Load FII/DII history when you need it. Keeping this request on-demand helps the dashboard open faster.")
+    if st.button("Load / refresh NSE FII/DII data"):
+        with st.spinner("Requesting the latest available NSE FII/DII report..."):
+            data, error = fetch_fii_dii()
+        st.session_state["fii_dii_data"] = data
+        st.session_state["fii_dii_error"] = error
+    if "fii_dii_data" in st.session_state:
+        data = st.session_state["fii_dii_data"]
+        error = st.session_state.get("fii_dii_error")
+        if data.empty:
+            st.error("NSE FII/DII data is currently unavailable.")
+            st.caption(f"NSE error: {error}")
+            st.info("Open the official NSE report link above to check the latest published figures. No values are fabricated.")
+        else:
+            sessions = st.selectbox("History to display", [5, 10, 20], index=0, format_func=lambda x: f"Last {x} trading sessions")
+            history = data.head(sessions).copy().sort_values("date_sort")
+            latest = data.iloc[0]
+            a,b = st.columns(2)
+            a.metric("Latest FII/FPI net (₹ crore)", f"{latest.fii_net:,.2f}")
+            b.metric("Latest DII net (₹ crore)", f"{latest.dii_net:,.2f}")
+            st.caption(f"Source: NSE · Latest available date: {latest.date_sort:%d %b %Y} · {len(history)} trading sessions displayed")
+            totals = history[["fii_buy","fii_sell","fii_net","dii_buy","dii_sell","dii_net"]].sum()
+            c1,c2,c3 = st.columns(3)
+            c1.metric(f"FII net · {len(history)} sessions", f"₹{totals.fii_net:,.2f} Cr")
+            c2.metric(f"DII net · {len(history)} sessions", f"₹{totals.dii_net:,.2f} Cr")
+            c3.metric("Combined net", f"₹{totals.fii_net + totals.dii_net:,.2f} Cr")
+            trend = history.set_index("date_sort")[["fii_net","dii_net"]].rename(columns={"fii_net":"FII/FPI net","dii_net":"DII net"})
+            st.line_chart(trend, use_container_width=True)
+            table = history[["date","fii_buy","fii_sell","fii_net","dii_buy","dii_sell","dii_net"]].rename(columns={
+                "date":"Date","fii_buy":"FII Buy (₹ Cr)","fii_sell":"FII Sell (₹ Cr)","fii_net":"FII Net (₹ Cr)",
+                "dii_buy":"DII Buy (₹ Cr)","dii_sell":"DII Sell (₹ Cr)","dii_net":"DII Net (₹ Cr)"
+            })
+            st.dataframe(table.sort_values("Date", ascending=False), use_container_width=True, hide_index=True)
+            st.download_button("Download FII/DII CSV", table.to_csv(index=False), "fii_dii_history.csv", "text/csv")
+            if len(history) < sessions:
+                st.info(f"NSE returned {len(history)} daily records. No missing sessions are invented.")
 
 with tabs[4]:
     st.subheader("Position sizing and risk")
