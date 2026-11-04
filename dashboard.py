@@ -22,30 +22,38 @@ def get_history(symbol, period="6mo", interval="1d"):
     except Exception:
         return pd.DataFrame()
 
-@st.cache_data(ttl=30, show_spinner=False)
-def get_quote(symbol):
-    # Prefer intraday bars; fall back to daily closes if intraday data is unavailable.
-    d = get_history(symbol, "5d", "5m")
-    if not d.empty and "Close" in d:
-        c = d.Close.dropna()
-        if len(c) >= 2:
-            latest = float(c.iloc[-1])
-            latest_day = c.index[-1].date()
-            prior_day_closes = c[c.index.date < latest_day]
-            if not prior_day_closes.empty:
-                previous_close = float(prior_day_closes.iloc[-1])
-                return latest, latest-previous_close, ((latest/previous_close)-1)*100 if previous_close else 0
-            previous = float(c.iloc[-2])
-            return latest, latest-previous, ((latest/previous)-1)*100 if previous else 0
-    d = get_history(symbol, "5d", "1d")
-    if d.empty or "Close" not in d:
-        return None
-    c = d.Close.dropna()
-    if c.empty:
-        return None
-    last = float(c.iloc[-1])
-    prev = float(c.iloc[-2]) if len(c) > 1 else last
-    return last, last-prev, ((last/prev)-1)*100 if prev else 0
+@st.cache_data(ttl=25, show_spinner=False)
+def get_market_quotes():
+    """Fetch all overview instruments together, with a short timeout."""
+    try:
+        data = yf.download(
+            tickers=list(symbols.values()),
+            period="5d",
+            interval="5m",
+            group_by="ticker",
+            auto_adjust=True,
+            threads=True,
+            progress=False,
+            timeout=8,
+        )
+        quotes = {}
+        for name, symbol in symbols.items():
+            try:
+                frame = data[symbol] if isinstance(data.columns, pd.MultiIndex) else data
+                close = frame["Close"].dropna()
+                if len(close) >= 2:
+                    latest = float(close.iloc[-1])
+                    latest_day = close.index[-1].date()
+                    prior = close[close.index.date < latest_day]
+                    previous = float(prior.iloc[-1]) if not prior.empty else float(close.iloc[-2])
+                    quotes[name] = (latest, latest - previous, ((latest / previous) - 1) * 100 if previous else 0)
+                else:
+                    quotes[name] = None
+            except Exception:
+                quotes[name] = None
+        return quotes
+    except Exception:
+        return {name: None for name in symbols}
 
 def rsi(series, n=14):
     delta = series.diff()
@@ -60,28 +68,20 @@ symbols = {
     "WTI Crude":"CL=F", "USD/INR":"INR=X"
 }
 st.subheader("Market overview")
-st.caption("Load prices on demand so a slow data provider cannot delay the initial page.")
-if st.button("Load market prices", key="load_market_prices"):
-    quotes = {}
-    with st.spinner("Loading market prices from Yahoo Finance..."):
-        for name, symbol in symbols.items():
-            quotes[name] = get_quote(symbol)
-    st.session_state["market_quotes"] = quotes
-quotes = st.session_state.get("market_quotes", {})
+# Refresh runs automatically with the 30-second page timer. Results are cached briefly.
+with st.spinner("Updating market prices..."):
+    quotes = get_market_quotes()
 cols = st.columns(4)
 for i, (name, symbol) in enumerate(symbols.items()):
     q = quotes.get(name)
     with cols[i % 4]:
         if q:
             st.metric(name, f"{q[0]:,.2f}", f"{q[1]:+,.2f} ({q[2]:+.2f}%)")
-        elif name in quotes:
-            st.metric(name, "Unavailable")
         else:
-            st.metric(name, "Not loaded")
-if st.button("Refresh data", key="clear_market_data"):
+            st.metric(name, "Unavailable")
+st.caption("Market overview refreshes automatically every 30 seconds. Prices depend on Yahoo Finance availability and may be delayed.")
+if st.button("Refresh data now", key="clear_market_data"):
     st.cache_data.clear()
-    st.session_state.pop("market_quotes", None)
-    st.session_state.pop("chart_data", None)
     st.rerun()
 
 tabs = st.tabs(["Charts", "Stock scanner", "Options payoff", "FII / DII", "Risk calculator", "Paper journal", "Resources"])
