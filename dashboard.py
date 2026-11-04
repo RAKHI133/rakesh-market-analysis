@@ -9,12 +9,12 @@ from zoneinfo import ZoneInfo
 from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Rakesh Market Analysis", page_icon="📈", layout="wide")
-st_autorefresh(interval=60_000, key="market_refresh")
+st_autorefresh(interval=30_000, key="market_refresh")
 st.title("🇮🇳 Rakesh Market Analysis")
-st.caption(f"India time: {datetime.now(ZoneInfo('Asia/Kolkata')):%d %b %Y, %I:%M:%S %p} IST · Refreshes every 60 seconds")
-st.warning("Yahoo Finance is unofficial and may be delayed, stale, incomplete, rate-limited, or unavailable. This dashboard is for research and paper trading, not investment advice.")
+st.caption(f"India time: {datetime.now(ZoneInfo('Asia/Kolkata')):%d %b %Y, %I:%M:%S %p} IST · Auto-refreshes every 30 seconds")
+st.warning("Market prices use Yahoo Finance intraday data where available. It is unofficial, may be delayed or unavailable, and is not guaranteed exchange real-time data. This dashboard is for research and paper trading, not investment advice.")
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=30, show_spinner=False)
 def get_history(symbol, period="6mo", interval="1d"):
     try:
         data = yf.Ticker(symbol).history(period=period, interval=interval, auto_adjust=True)
@@ -22,7 +22,21 @@ def get_history(symbol, period="6mo", interval="1d"):
     except Exception:
         return pd.DataFrame()
 
+@st.cache_data(ttl=30, show_spinner=False)
 def get_quote(symbol):
+    # Prefer intraday bars; fall back to daily closes if intraday data is unavailable.
+    d = get_history(symbol, "5d", "5m")
+    if not d.empty and "Close" in d:
+        c = d.Close.dropna()
+        if len(c) >= 2:
+            latest = float(c.iloc[-1])
+            latest_day = c.index[-1].date()
+            prior_day_closes = c[c.index.date < latest_day]
+            if not prior_day_closes.empty:
+                previous_close = float(prior_day_closes.iloc[-1])
+                return latest, latest-previous_close, ((latest/previous_close)-1)*100 if previous_close else 0
+            previous = float(c.iloc[-2])
+            return latest, latest-previous, ((latest/previous)-1)*100 if previous else 0
     d = get_history(symbol, "5d", "1d")
     if d.empty or "Close" not in d:
         return None
@@ -179,16 +193,6 @@ def fetch_nse_fii_dii():
     if df.empty:
         raise ValueError("NSE response format did not contain matching FII and DII rows.")
     return df.sort_values("date_sort", ascending=False).drop_duplicates("date_sort")
-
-@st.cache_data(ttl=900, show_spinner=False)
-def fetch_fii_dii():
-    try:
-        return fetch_moneycontrol_fii_dii(), "Moneycontrol", None, None
-    except Exception as moneycontrol_error:
-        try:
-            return fetch_nse_fii_dii(), "NSE fallback", str(moneycontrol_error), None
-        except Exception as nse_error:
-            return pd.DataFrame(), None, str(moneycontrol_error), str(nse_error)
 
 @st.cache_data(ttl=900, show_spinner=False)
 def fetch_fii_dii():
