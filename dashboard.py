@@ -60,16 +60,28 @@ symbols = {
     "WTI Crude":"CL=F", "USD/INR":"INR=X"
 }
 st.subheader("Market overview")
+st.caption("Load prices on demand so a slow data provider cannot delay the initial page.")
+if st.button("Load market prices", key="load_market_prices"):
+    quotes = {}
+    with st.spinner("Loading market prices from Yahoo Finance..."):
+        for name, symbol in symbols.items():
+            quotes[name] = get_quote(symbol)
+    st.session_state["market_quotes"] = quotes
+quotes = st.session_state.get("market_quotes", {})
 cols = st.columns(4)
 for i, (name, symbol) in enumerate(symbols.items()):
-    q = get_quote(symbol)
+    q = quotes.get(name)
     with cols[i % 4]:
         if q:
             st.metric(name, f"{q[0]:,.2f}", f"{q[1]:+,.2f} ({q[2]:+.2f}%)")
-        else:
+        elif name in quotes:
             st.metric(name, "Unavailable")
-if st.button("Refresh data"):
+        else:
+            st.metric(name, "Not loaded")
+if st.button("Refresh data", key="clear_market_data"):
     st.cache_data.clear()
+    st.session_state.pop("market_quotes", None)
+    st.session_state.pop("chart_data", None)
     st.rerun()
 
 tabs = st.tabs(["Charts", "Stock scanner", "Options payoff", "FII / DII", "Risk calculator", "Paper journal", "Resources"])
@@ -81,22 +93,31 @@ with tabs[0]:
     interval = st.selectbox("Interval", ["1m","5m","15m","1d"], index=3)
     if period not in ["1d","5d"]:
         interval = "1d"
-    d = get_history(chart_symbols[instrument], period, interval)
-    if d.empty:
-        st.info("No chart data returned. Try another instrument or period.")
+    chart_key = (chart_symbols[instrument], period, interval)
+    if st.button("Load chart", key="load_chart"):
+        with st.spinner("Loading chart data..."):
+            chart_frame = get_history(*chart_key)
+        st.session_state["chart_data"] = (chart_key, chart_frame)
+    saved_chart = st.session_state.get("chart_data")
+    if saved_chart and saved_chart[0] == chart_key:
+        d = saved_chart[1].copy()
+        if d.empty:
+            st.info("No chart data returned. Try another instrument or period.")
+        else:
+            d["SMA20"] = d.Close.rolling(20).mean()
+            d["SMA50"] = d.Close.rolling(50).mean()
+            fig = go.Figure()
+            fig.add_trace(go.Candlestick(x=d.index, open=d.Open, high=d.High, low=d.Low, close=d.Close, name="Price"))
+            fig.add_trace(go.Scatter(x=d.index, y=d.SMA20, name="SMA 20"))
+            fig.add_trace(go.Scatter(x=d.index, y=d.SMA50, name="SMA 50"))
+            fig.update_layout(height=480, xaxis_rangeslider_visible=False)
+            st.plotly_chart(fig, use_container_width=True)
+            c1,c2 = st.columns(2)
+            with c1: st.line_chart(rsi(d.Close).rename("RSI 14"))
+            with c2:
+                if "Volume" in d: st.bar_chart(d.Volume)
     else:
-        d["SMA20"] = d.Close.rolling(20).mean()
-        d["SMA50"] = d.Close.rolling(50).mean()
-        fig = go.Figure()
-        fig.add_trace(go.Candlestick(x=d.index, open=d.Open, high=d.High, low=d.Low, close=d.Close, name="Price"))
-        fig.add_trace(go.Scatter(x=d.index, y=d.SMA20, name="SMA 20"))
-        fig.add_trace(go.Scatter(x=d.index, y=d.SMA50, name="SMA 50"))
-        fig.update_layout(height=480, xaxis_rangeslider_visible=False)
-        st.plotly_chart(fig, use_container_width=True)
-        c1,c2 = st.columns(2)
-        with c1: st.line_chart(rsi(d.Close).rename("RSI 14"))
-        with c2:
-            if "Volume" in d: st.bar_chart(d.Volume)
+        st.info("Choose an instrument and click Load chart to retrieve its data.")
 
 with tabs[1]:
     st.subheader("Technical scanner")
