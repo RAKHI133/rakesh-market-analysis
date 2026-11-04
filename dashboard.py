@@ -1,0 +1,242 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import yfinance as yf
+import plotly.graph_objects as go
+from datetime import date, datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
+from streamlit_autorefresh import st_autorefresh
+
+st.set_page_config(page_title="Rakesh Market Analysis", page_icon="📈", layout="wide")
+st_autorefresh(interval=60_000, key="market_refresh")
+st.title("🇮🇳 Rakesh Market Analysis")
+st.caption(f"India time: {datetime.now(ZoneInfo('Asia/Kolkata')):%d %b %Y, %I:%M:%S %p} IST · Refreshes every 60 seconds")
+st.warning("Yahoo Finance is unofficial and may be delayed, stale, incomplete, rate-limited, or unavailable. This dashboard is for research and paper trading, not investment advice.")
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_history(symbol, period="6mo", interval="1d"):
+    try:
+        data = yf.Ticker(symbol).history(period=period, interval=interval, auto_adjust=True)
+        return data.dropna(how="all") if data is not None else pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
+
+def get_quote(symbol):
+    d = get_history(symbol, "5d", "1d")
+    if d.empty or "Close" not in d:
+        return None
+    c = d.Close.dropna()
+    if c.empty:
+        return None
+    last = float(c.iloc[-1])
+    prev = float(c.iloc[-2]) if len(c) > 1 else last
+    return last, last-prev, ((last/prev)-1)*100 if prev else 0
+
+def rsi(series, n=14):
+    delta = series.diff()
+    gain = delta.clip(lower=0).ewm(alpha=1/n, adjust=False).mean()
+    loss = (-delta.clip(upper=0)).ewm(alpha=1/n, adjust=False).mean()
+    rs = gain / loss.replace(0, np.nan)
+    return 100 - 100/(1+rs)
+
+symbols = {
+    "NIFTY 50":"^NSEI", "NIFTY BANK":"^NSEBANK", "SENSEX":"^BSESN",
+    "INDIA VIX":"^INDIAVIX", "S&P 500":"^GSPC", "NASDAQ":"^IXIC",
+    "WTI Crude":"CL=F", "USD/INR":"INR=X"
+}
+st.subheader("Market overview")
+cols = st.columns(4)
+for i, (name, symbol) in enumerate(symbols.items()):
+    q = get_quote(symbol)
+    with cols[i % 4]:
+        if q:
+            st.metric(name, f"{q[0]:,.2f}", f"{q[1]:+,.2f} ({q[2]:+.2f}%)")
+        else:
+            st.metric(name, "Unavailable")
+if st.button("Refresh data"):
+    st.cache_data.clear()
+    st.rerun()
+
+tabs = st.tabs(["Charts", "Stock scanner", "Options payoff", "FII / DII", "Risk calculator", "Paper journal", "Resources"])
+
+with tabs[0]:
+    chart_symbols = {"NIFTY 50":"^NSEI","NIFTY BANK":"^NSEBANK","SENSEX":"^BSESN","RELIANCE":"RELIANCE.NS","HDFCBANK":"HDFCBANK.NS","ICICIBANK":"ICICIBANK.NS","INFY":"INFY.NS","TCS":"TCS.NS","SBIN":"SBIN.NS"}
+    instrument = st.selectbox("Instrument", list(chart_symbols))
+    period = st.selectbox("Period", ["1d","5d","1mo","3mo","6mo","1y","2y"], index=2)
+    interval = st.selectbox("Interval", ["1m","5m","15m","1d"], index=3)
+    if period not in ["1d","5d"]:
+        interval = "1d"
+    d = get_history(chart_symbols[instrument], period, interval)
+    if d.empty:
+        st.info("No chart data returned. Try another instrument or period.")
+    else:
+        d["SMA20"] = d.Close.rolling(20).mean()
+        d["SMA50"] = d.Close.rolling(50).mean()
+        fig = go.Figure()
+        fig.add_trace(go.Candlestick(x=d.index, open=d.Open, high=d.High, low=d.Low, close=d.Close, name="Price"))
+        fig.add_trace(go.Scatter(x=d.index, y=d.SMA20, name="SMA 20"))
+        fig.add_trace(go.Scatter(x=d.index, y=d.SMA50, name="SMA 50"))
+        fig.update_layout(height=480, xaxis_rangeslider_visible=False)
+        st.plotly_chart(fig, use_container_width=True)
+        c1,c2 = st.columns(2)
+        with c1: st.line_chart(rsi(d.Close).rename("RSI 14"))
+        with c2:
+            if "Volume" in d: st.bar_chart(d.Volume)
+
+with tabs[1]:
+    st.subheader("Technical scanner")
+    raw = st.text_input("Yahoo symbols, comma-separated", "RELIANCE.NS,HDFCBANK.NS,ICICIBANK.NS,INFY.NS,TCS.NS,SBIN.NS,ITC.NS,LT.NS")
+    if st.button("Run scanner"):
+        rows = []
+        for symbol in [x.strip().upper() for x in raw.split(",") if x.strip()]:
+            d = get_history(symbol, "6mo")
+            if len(d) >= 20:
+                c = d.Close.dropna()
+                s20 = c.rolling(20).mean().iloc[-1]
+                s50 = c.rolling(50).mean().iloc[-1] if len(c) >= 50 else np.nan
+                rows.append({"Symbol":symbol,"Close":round(float(c.iloc[-1]),2),"SMA20":round(float(s20),2),"SMA50":round(float(s50),2) if pd.notna(s50) else None,"RSI14":round(float(rsi(c).iloc[-1]),1)})
+        if rows:
+            result = pd.DataFrame(rows)
+            st.dataframe(result, use_container_width=True, hide_index=True)
+            st.download_button("Download scanner CSV", result.to_csv(index=False), "scanner.csv", "text/csv")
+        else: st.warning("No scanner data returned.")
+
+with tabs[2]:
+    st.subheader("Manual options expiry payoff")
+    st.caption("Manual estimate only; no live option-chain, premium, Greeks, or IV feed.")
+    a,b,c = st.columns(3)
+    with a:
+        option = st.selectbox("Option type", ["CE (Call)","PE (Put)"])
+        strike = st.number_input("Strike", min_value=0.0, value=25000.0, step=50.0)
+        premium = st.number_input("Premium per unit (₹)", min_value=0.0, value=150.0)
+    with b:
+        qty = st.number_input("Quantity / units", min_value=1, value=75)
+        low = st.number_input("Scenario low", min_value=0.0, value=24000.0)
+        high = st.number_input("Scenario high", min_value=0.0, value=26000.0)
+    with c:
+        costs = st.number_input("Estimated costs (₹)", min_value=0.0, value=0.0)
+    if high > low:
+        prices = np.linspace(low, high, 101)
+        intrinsic = np.maximum(prices-strike,0) if option.startswith("CE") else np.maximum(strike-prices,0)
+        pnl = (intrinsic-premium)*qty-costs
+        fig = go.Figure(go.Scatter(x=prices,y=pnl,mode="lines",name="Expiry P/L"))
+        fig.add_hline(y=0,line_dash="dash")
+        fig.update_layout(height=350,xaxis_title="Underlying at expiry",yaxis_title="Estimated P/L (₹)")
+        st.plotly_chart(fig,use_container_width=True)
+        st.write(f"Break-even: ₹{(strike+premium if option.startswith('CE') else strike-premium):,.2f}")
+        st.write(f"Maximum long-option loss: ₹{premium*qty+costs:,.2f}")
+    else: st.error("Scenario high must exceed scenario low.")
+
+@st.cache_data(ttl=900, show_spinner=False)
+def fetch_fii_dii():
+    import requests
+    url = "https://www.nseindia.com/api/fiidiiTradeReact"
+    headers = {"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36","Accept":"application/json, text/plain, */*","Referer":"https://www.nseindia.com/reports/fii-dii"}
+    try:
+        s = requests.Session()
+        s.headers.update(headers)
+        s.get("https://www.nseindia.com/", timeout=15)
+        response = s.get(url, timeout=20)
+        response.raise_for_status()
+        payload = response.json()
+        if isinstance(payload, dict): payload = payload.get("data", payload.get("records", []))
+        df = pd.DataFrame(payload)
+        aliases = {"category":["category","categoryName","type"],"date":["date","tradingDate","tradeDate"],"buy":["buyValue","buy","buy_value"],"sell":["sellValue","sell","sell_value"],"net":["netValue","net","net_value"]}
+        lower = {str(col).lower():col for col in df.columns}
+        rename = {}
+        for target, candidates in aliases.items():
+            for candidate in candidates:
+                if candidate.lower() in lower:
+                    rename[lower[candidate.lower()]] = target
+                    break
+        df = df.rename(columns=rename)
+        if not {"category","date","buy","sell","net"}.issubset(df.columns):
+            return pd.DataFrame(), "NSE response format changed or was incomplete."
+        for col in ["buy","sell","net"]:
+            df[col] = pd.to_numeric(df[col].astype(str).str.replace(",",""), errors="coerce")
+        df = df.dropna(subset=["buy","sell","net"])
+        return df[["date","category","buy","sell","net"]], None if not df.empty else "No numeric FII/DII data returned."
+    except Exception as e:
+        return pd.DataFrame(), f"Automatic NSE retrieval unavailable ({type(e).__name__})."
+
+with tabs[3]:
+    st.subheader("Automated FII / DII tracker")
+    st.markdown("[Official NSE FII/DII report](https://www.nseindia.com/reports/fii-dii) · [NSDL FPI reports](https://www.fpi.nsdl.co.in/web/Reports/Latest.aspx)")
+    st.caption("NSE published daily cash-market summary; not live intraday flows. NSE may block or change this unofficial endpoint.")
+    data, error = fetch_fii_dii()
+    if error:
+        st.warning(error)
+        st.info("Open the official NSE report for the latest figures. No figures are invented when the feed fails.")
+    else:
+        data["date_sort"] = pd.to_datetime(data.date, errors="coerce", dayfirst=True)
+        latest_date = data.date_sort.max()
+        latest = data[data.date_sort == latest_date].copy()
+        st.write(f"Latest report date: {latest_date:%d %b %Y}" if pd.notna(latest_date) else "Latest report returned")
+        st.dataframe(latest.drop(columns=["date_sort"]), use_container_width=True, hide_index=True)
+        for _, row in latest.iterrows():
+            label = str(row.category).upper()
+            if "FII" in label or "FPI" in label: st.metric("FII / FPI net (₹ crore)", f"{row.net:,.2f}")
+            if "DII" in label: st.metric("DII net (₹ crore)", f"{row.net:,.2f}")
+        st.download_button("Download FII/DII CSV", latest.drop(columns=["date_sort"]).to_csv(index=False), "fii_dii.csv", "text/csv")
+
+with tabs[4]:
+    st.subheader("Position sizing and risk")
+    a,b = st.columns(2)
+    with a:
+        capital = st.number_input("Trading capital (₹)", min_value=0.0, value=100000.0, step=5000.0)
+        risk_pct = st.slider("Risk per trade (%)", 0.1, 5.0, 1.0, 0.1)
+        entry = st.number_input("Entry price (₹)", min_value=0.0, value=500.0)
+        stop = st.number_input("Stop-loss price (₹)", min_value=0.0, value=490.0)
+    with b:
+        target = st.number_input("Target price (₹)", min_value=0.0, value=530.0)
+        lot = st.number_input("Quantity step / lot size", min_value=1, value=1)
+    if entry > 0 and stop > 0 and entry != stop:
+        risk_budget = capital*risk_pct/100
+        unit_risk = abs(entry-stop)
+        quantity = int(risk_budget/unit_risk)//int(lot)*int(lot)
+        st.metric("Risk budget", f"₹{risk_budget:,.2f}")
+        st.metric("Indicative quantity", f"{quantity:,}")
+        st.metric("Risk at stop", f"₹{quantity*unit_risk:,.2f}")
+        st.metric("Reward / risk", f"1 : {abs(target-entry)/unit_risk:.2f}")
+    else: st.warning("Enter a positive entry and a different positive stop.")
+
+with tabs[5]:
+    st.subheader("Paper trading journal")
+    st.caption("Journal is saved on the hosting server's local disk and may not persist reliably across app restarts or redeployments. Download backups.")
+    file = Path("paper_trades.csv")
+    columns = ["Date","Symbol","Side","Entry","Exit","Quantity","Stop Loss","Notes"]
+    try: trades = pd.read_csv(file) if file.exists() else pd.DataFrame(columns=columns)
+    except Exception: trades = pd.DataFrame(columns=columns)
+    with st.form("paper_trade"):
+        a,b,c = st.columns(3)
+        with a:
+            trade_date = st.date_input("Trade date", date.today())
+            symbol = st.text_input("Symbol", "RELIANCE")
+            side = st.selectbox("Side", ["BUY","SELL"])
+        with b:
+            buy = st.number_input("Entry", min_value=0.0, value=0.0)
+            sell = st.number_input("Exit (0 if open)", min_value=0.0, value=0.0)
+            quantity = st.number_input("Quantity", min_value=1, value=1)
+        with c:
+            sl = st.number_input("Stop loss", min_value=0.0, value=0.0)
+            notes = st.text_input("Notes")
+        submitted = st.form_submit_button("Save paper trade")
+        if submitted:
+            new = pd.DataFrame([{"Date":str(trade_date),"Symbol":symbol.upper(),"Side":side,"Entry":buy,"Exit":sell,"Quantity":quantity,"Stop Loss":sl,"Notes":notes}])
+            pd.concat([trades,new], ignore_index=True).to_csv(file,index=False)
+            st.success("Paper trade saved on this app instance.")
+            st.rerun()
+    if not trades.empty:
+        view = trades.copy()
+        view["P/L before costs"] = np.where(view.Exit>0,(view.Exit-view.Entry)*view.Quantity*np.where(view.Side=="BUY",1,-1),np.nan)
+        st.dataframe(view,use_container_width=True,hide_index=True)
+        st.download_button("Download paper journal CSV",view.to_csv(index=False),"paper_trades_backup.csv","text/csv")
+
+with tabs[6]:
+    st.subheader("Official resources")
+    resources = {"NSE India":"https://www.nseindia.com/","NSE market data":"https://www.nseindia.com/market-data","BSE":"https://www.bseindia.com/","SEBI investor portal":"https://investor.sebi.gov.in/","RBI":"https://www.rbi.org.in/","MCX":"https://www.mcxindia.com/","MOSPI":"https://www.mospi.gov.in/"}
+    for label, url in resources.items(): st.markdown(f"- [{label}]({url})")
+    st.markdown("**Important:** No broker connection, credentials, or order execution. Options payoff uses manual inputs. Verify prices, expiry dates, lot sizes, and charges with official exchange/broker sources before trading.")
+st.divider()
+st.caption("Rakesh Market Analysis · Educational research and paper trading only · Not investment advice")
