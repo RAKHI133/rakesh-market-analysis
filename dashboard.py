@@ -235,8 +235,75 @@ with tabs[5]:
 
 with tabs[6]:
     st.subheader("Official resources")
-    resources = {"NSE India":"https://www.nseindia.com/","NSE market data":"https://www.nseindia.com/market-data","BSE":"https://www.bseindia.com/","SEBI investor portal":"https://investor.sebi.gov.in/","RBI":"https://www.rbi.org.in/","MCX":"https://www.mcxindia.com/","MOSPI":"https://www.mospi.gov.in/"}
-    for label, url in resources.items(): st.markdown(f"- [{label}]({url})")
-    st.markdown("**Important:** No broker connection, credentials, or order execution. Options payoff uses manual inputs. Verify prices, expiry dates, lot sizes, and charges with official exchange/broker sources before trading.")
+    st.caption("Curated links to Indian exchanges, regulators, government departments and financial-market institutions. These links open official websites; they do not automatically provide live data to this dashboard.")
+    resource_groups = {
+        "Stock Exchanges": {
+            "NSE India":"https://www.nseindia.com/",
+            "NSE Market Data":"https://www.nseindia.com/market-data",
+            "BSE India":"https://www.bseindia.com/",
+            "NSE India VIX":"https://www.nseindia.com/market-data/live-market-indices",
+        },
+        "F&O and Derivatives": {
+            "NSE Equity Derivatives":"https://www.nseindia.com/market-data/equity-derivatives",
+            "NSE Contract Information":"https://www.nseindia.com/market-data/securities-available-for-trading",
+            "NSE Clearing":"https://www.nscclindia.com/",
+            "BSE Derivatives":"https://www.bseindia.com/markets/Derivatives/DeriReports/deriReports.aspx",
+            "India Clearing Corporation":"https://www.icclindia.com/",
+        },
+        "Commodities": {
+            "Multi Commodity Exchange (MCX)":"https://www.mcxindia.com/",
+            "National Commodity & Derivatives Exchange (NCDEX)":"https://www.ncdex.com/",
+        },
+        "FII/FPI and DII": {
+            "NSE FII/DII Activity":"https://www.nseindia.com/reports/fii-dii",
+            "NSDL FPI Reports":"https://www.fpi.nsdl.co.in/web/Reports/Latest.aspx",
+            "CDSL":"https://www.cdslindia.com/",
+            "NSDL":"https://nsdl.co.in/",
+        },
+        "Corporate Filings and IPOs": {
+            "NSE Corporate Filings":"https://www.nseindia.com/companies-listing/corporate-filings-announcements",
+            "BSE Corporate Announcements":"https://www.bseindia.com/corporates/ann.html",
+            "Ministry of Corporate Affairs":"https://www.mca.gov.in/",
+            "SEBI Public Issues and Disclosures":"https://www.sebi.gov.in/",
+        },
+        "Regulators and Investor Protection": {
+            "SEBI":"https://www.sebi.gov.in/",
+            "SEBI Investor Portal":"https://investor.sebi.gov.in/",
+            "SEBI SCORES Complaints":"https://scores.sebi.gov.in/",
+            "SMART ODR":"https://smartodr.in/",
+            "IFSCA":"https://www.ifsca.gov.in/",
+            "PFRDA":"https://www.pfrda.org.in/",
+            "IRDAI":"https://irdai.gov.in/",
+            "IEPFA":"https://www.iepf.gov.in/",
+        },
+        "Banking and Forex": {
+            "Reserve Bank of India":"https://www.rbi.org.in/",
+            "RBI Database on Indian Economy":"https://data.rbi.org.in/",
+            "CCIL":"https://www.ccilindia.com/",
+            "Financial Benchmarks India (FBIL)":"https://www.fbil.org.in/",
+            "FEDAI":"https://www.fedai.org.in/",
+        },
+        "Economic Indicators and Government Data": {
+            "Ministry of Statistics and Programme Implementation":"https://www.mospi.gov.in/",
+            "Ministry of Finance":"https://finmin.gov.in/",
+            "Union Budget of India":"https://www.indiabudget.gov.in/",
+            "Press Information Bureau":"https://pib.gov.in/",
+            "Open Government Data Platform":"https://www.data.gov.in/",
+        },
+        "Mutual Funds and Depositories": {
+            "Association of Mutual Funds in India (AMFI)":"https://www.amfiindia.com/",
+            "AMFI NAV":"https://www.amfiindia.com/net-asset-value/nav",
+            "National Institute of Securities Markets (NISM)":"https://www.nism.ac.in/",
+        },
+    }
+    search_resource = st.text_input("Search official resources", placeholder="Search NSE, FII, RBI, IPO, mutual funds...")
+    for category, resources in resource_groups.items():
+        filtered = {name:url for name,url in resources.items() if search_resource.lower() in name.lower() or search_resource.lower() in category.lower()}
+        if filtered:
+            with st.expander(f"{category} ({len(filtered)})", expanded=bool(search_resource)):
+                for label, url in filtered.items():
+                    st.markdown(f"- **[{label}]({url})**")
+    st.caption(f"{sum(len(items) for items in resource_groups.values())} official resource links across {len(resource_groups)} categories.")
+    st.markdown("**Important:** These are links to official institutional websites, not guaranteed live-data feeds or APIs. No broker connection, credentials, or order execution. Options payoff uses manual inputs. Verify prices, expiry dates, lot sizes, and charges with official exchange/broker sources before trading.")
 st.divider()
 st.caption("Rakesh Market Analysis · Educational research and paper trading only · Not investment advice")
