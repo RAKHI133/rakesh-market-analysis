@@ -134,51 +134,81 @@ def fetch_fii_dii():
     url = "https://www.nseindia.com/api/fiidiiTradeReact"
     headers = {"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36","Accept":"application/json, text/plain, */*","Referer":"https://www.nseindia.com/reports/fii-dii"}
     try:
-        s = requests.Session()
-        s.headers.update(headers)
-        s.get("https://www.nseindia.com/", timeout=15)
-        response = s.get(url, timeout=20)
+        session = requests.Session()
+        session.headers.update(headers)
+        session.get("https://www.nseindia.com/", timeout=15)
+        response = session.get(url, timeout=20)
         response.raise_for_status()
         payload = response.json()
-        if isinstance(payload, dict): payload = payload.get("data", payload.get("records", []))
-        df = pd.DataFrame(payload)
-        aliases = {"category":["category","categoryName","type"],"date":["date","tradingDate","tradeDate"],"buy":["buyValue","buy","buy_value"],"sell":["sellValue","sell","sell_value"],"net":["netValue","net","net_value"]}
-        lower = {str(col).lower():col for col in df.columns}
+        if isinstance(payload, dict):
+            payload = payload.get("data", payload.get("records", []))
+        raw = pd.DataFrame(payload)
+        if raw.empty:
+            return pd.DataFrame(), "NSE returned no FII/DII records."
+        # NSE's current response uses fiibuy/fiisell/fiinet and diibuy/diisell/diinet.
+        lower = {str(col).lower():col for col in raw.columns}
+        aliases = {
+            "date":["date","tradingdate","tradedate"],
+            "fii_buy":["fiibuy","fiibuyvalue","fii_buy","buyvalue"],
+            "fii_sell":["fiisell","fiisellvalue","fii_sell","sellvalue"],
+            "fii_net":["fiinet","fiinetvalue","fii_net","netvalue"],
+            "dii_buy":["diibuy","diibuyvalue","dii_buy"],
+            "dii_sell":["diisell","diisellvalue","dii_sell"],
+            "dii_net":["diinet","diinetvalue","dii_net"],
+        }
         rename = {}
         for target, candidates in aliases.items():
             for candidate in candidates:
-                if candidate.lower() in lower:
-                    rename[lower[candidate.lower()]] = target
+                if candidate in lower:
+                    rename[lower[candidate]] = target
                     break
-        df = df.rename(columns=rename)
-        if not {"category","date","buy","sell","net"}.issubset(df.columns):
-            return pd.DataFrame(), "NSE response format changed or was incomplete."
-        for col in ["buy","sell","net"]:
-            df[col] = pd.to_numeric(df[col].astype(str).str.replace(",",""), errors="coerce")
-        df = df.dropna(subset=["buy","sell","net"])
-        return df[["date","category","buy","sell","net"]], None if not df.empty else "No numeric FII/DII data returned."
+        raw = raw.rename(columns=rename)
+        required = ["date","fii_buy","fii_sell","fii_net","dii_buy","dii_sell","dii_net"]
+        if not set(required).issubset(raw.columns):
+            return pd.DataFrame(), "NSE response format changed or does not contain both FII and DII history."
+        for col in required[1:]:
+            raw[col] = pd.to_numeric(raw[col].astype(str).str.replace(",",""), errors="coerce")
+        raw["date_sort"] = pd.to_datetime(raw["date"], errors="coerce", dayfirst=True)
+        raw = raw.dropna(subset=["date_sort"] + required[1:])
+        raw = raw.sort_values("date_sort", ascending=False).drop_duplicates("date_sort")
+        return raw[["date","date_sort","fii_buy","fii_sell","fii_net","dii_buy","dii_sell","dii_net"]], None if not raw.empty else "NSE returned no usable historical records."
     except Exception as e:
         return pd.DataFrame(), f"Automatic NSE retrieval unavailable ({type(e).__name__})."
 
 with tabs[3]:
     st.subheader("Automated FII / DII tracker")
     st.markdown("[Official NSE FII/DII report](https://www.nseindia.com/reports/fii-dii) · [NSDL FPI reports](https://www.fpi.nsdl.co.in/web/Reports/Latest.aspx)")
-    st.caption("NSE published daily cash-market summary; not live intraday flows. NSE may block or change this unofficial endpoint.")
+    st.caption("NSE publishes daily cash-market activity after market close. Figures are provisional and may be revised; this endpoint may change or be restricted.")
     data, error = fetch_fii_dii()
     if error:
         st.warning(error)
-        st.info("Open the official NSE report for the latest figures. No figures are invented when the feed fails.")
+        st.info("Open the official NSE report for the latest figures. No historical values are fabricated when the feed fails.")
     else:
-        data["date_sort"] = pd.to_datetime(data.date, errors="coerce", dayfirst=True)
-        latest_date = data.date_sort.max()
-        latest = data[data.date_sort == latest_date].copy()
-        st.write(f"Latest report date: {latest_date:%d %b %Y}" if pd.notna(latest_date) else "Latest report returned")
-        st.dataframe(latest.drop(columns=["date_sort"]), use_container_width=True, hide_index=True)
-        for _, row in latest.iterrows():
-            label = str(row.category).upper()
-            if "FII" in label or "FPI" in label: st.metric("FII / FPI net (₹ crore)", f"{row.net:,.2f}")
-            if "DII" in label: st.metric("DII net (₹ crore)", f"{row.net:,.2f}")
-        st.download_button("Download FII/DII CSV", latest.drop(columns=["date_sort"]).to_csv(index=False), "fii_dii.csv", "text/csv")
+        sessions = st.selectbox("History to display", [5, 10, 20], index=0, format_func=lambda x: f"Last {x} trading sessions")
+        history = data.head(sessions).copy().sort_values("date_sort")
+        latest = data.iloc[0]
+        a,b = st.columns(2)
+        with a:
+            st.metric("Latest FII/FPI net (₹ crore)", f"{latest.fii_net:,.2f}")
+        with b:
+            st.metric("Latest DII net (₹ crore)", f"{latest.dii_net:,.2f}")
+        st.caption(f"Latest available report: {latest.date_sort:%d %b %Y} · Showing {len(history)} available trading sessions")
+        totals = history[["fii_buy","fii_sell","fii_net","dii_buy","dii_sell","dii_net"]].sum()
+        c1,c2,c3,c4 = st.columns(4)
+        c1.metric(f"FII net · {len(history)} sessions", f"₹{totals.fii_net:,.2f} Cr")
+        c2.metric(f"DII net · {len(history)} sessions", f"₹{totals.dii_net:,.2f} Cr")
+        c3.metric("Combined net", f"₹{totals.fii_net + totals.dii_net:,.2f} Cr")
+        c4.metric("Sessions returned", str(len(history)))
+        trend = history.set_index("date_sort")[["fii_net","dii_net"]].rename(columns={"fii_net":"FII/FPI net","dii_net":"DII net"})
+        st.line_chart(trend, use_container_width=True)
+        table = history[["date","fii_buy","fii_sell","fii_net","dii_buy","dii_sell","dii_net"]].rename(columns={
+            "date":"Date","fii_buy":"FII Buy (₹ Cr)","fii_sell":"FII Sell (₹ Cr)","fii_net":"FII Net (₹ Cr)",
+            "dii_buy":"DII Buy (₹ Cr)","dii_sell":"DII Sell (₹ Cr)","dii_net":"DII Net (₹ Cr)"
+        })
+        st.dataframe(table.sort_values("Date", ascending=False), use_container_width=True, hide_index=True)
+        st.download_button("Download FII/DII history CSV", table.to_csv(index=False), "fii_dii_history.csv", "text/csv")
+        if len(history) < sessions:
+            st.info(f"NSE returned only {len(history)} records. The NSE endpoint may expose a limited recent history; older sessions are not invented.")
 
 with tabs[4]:
     st.subheader("Position sizing and risk")
