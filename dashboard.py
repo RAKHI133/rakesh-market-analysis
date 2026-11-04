@@ -129,59 +129,119 @@ with tabs[2]:
     else: st.error("Scenario high must exceed scenario low.")
 
 @st.cache_data(ttl=900, show_spinner=False)
-def fetch_fii_dii():
+def fetch_moneycontrol_fii_dii():
     import requests
     import re
     from bs4 import BeautifulSoup
     url = "https://www.moneycontrol.com/stocks/marketstats/fii_dii_activity/"
     headers = {"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36","Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"}
+    response = requests.get(url, headers=headers, timeout=20)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
+    records = []
+    date_pattern = re.compile(r"^\d{1,2}[- ](?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[- ]\d{2,4}$", re.I)
+    for table in soup.find_all("table"):
+        for tr in table.find_all("tr"):
+            cells = [cell.get_text(" ", strip=True).replace("₹","").replace("Rs.","").strip() for cell in tr.find_all(["td","th"])]
+            date_cell = next((value for value in cells if date_pattern.match(value)), None)
+            if not date_cell:
+                continue
+            nums = []
+            for value in cells[cells.index(date_cell)+1:]:
+                cleaned = value.replace(",","").replace("%","").strip()
+                if re.fullmatch(r"-?\d+(?:\.\d+)?", cleaned):
+                    nums.append(float(cleaned))
+            if len(nums) >= 6:
+                parsed_date = pd.to_datetime(date_cell, errors="coerce", dayfirst=True)
+                if pd.notna(parsed_date):
+                    records.append({"date":parsed_date.strftime("%d-%b-%Y"),"date_sort":parsed_date,
+                        "fii_buy":nums[0],"fii_sell":nums[1],"fii_net":nums[2],
+                        "dii_buy":nums[3],"dii_sell":nums[4],"dii_net":nums[5]})
+    df = pd.DataFrame(records)
+    if df.empty:
+        raise ValueError("Moneycontrol page loaded, but its daily FII/DII table could not be parsed.")
+    return df.sort_values("date_sort", ascending=False).drop_duplicates("date_sort")
+
+@st.cache_data(ttl=900, show_spinner=False)
+def fetch_nse_fii_dii():
+    import requests
+    import re
+    session = requests.Session()
+    session.headers.update({"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
+        "Accept":"application/json, text/plain, */*","Referer":"https://www.nseindia.com/reports/fii-dii"})
+    session.get("https://www.nseindia.com/", timeout=15)
+    response = session.get("https://www.nseindia.com/api/fiidiiTradeReact", timeout=20)
+    response.raise_for_status()
+    payload = response.json()
+    if isinstance(payload, dict):
+        payload = payload.get("data", payload.get("records", []))
+    if not isinstance(payload, list) or not payload:
+        raise ValueError("NSE returned no FII/DII records.")
+    rows = {}
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        normalized = {re.sub(r"[^a-z0-9]", "", str(k).lower()): v for k, v in item.items()}
+        date_value = next((normalized[k] for k in ("date","tradingdate","tradedate") if normalized.get(k)), None)
+        if not date_value:
+            continue
+        dt = pd.to_datetime(date_value, errors="coerce", dayfirst=True)
+        if pd.isna(dt):
+            continue
+        category = str(normalized.get("category", normalized.get("investor", normalized.get("clienttype", "")))).lower()
+        buy = next((normalized[k] for k in ("buyvalue","grossbuy","buy","purchasevalue") if k in normalized), None)
+        sell = next((normalized[k] for k in ("sellvalue","grosssell","sell","salevalue") if k in normalized), None)
+        net = next((normalized[k] for k in ("netvalue","net","netpurchase") if k in normalized), None)
+        if buy is None or sell is None or net is None:
+            continue
+        try:
+            values = [float(str(v).replace(",","")) for v in (buy, sell, net)]
+        except (TypeError, ValueError):
+            continue
+        key = dt.strftime("%Y-%m-%d")
+        row = rows.setdefault(key, {"date":dt.strftime("%d-%b-%Y"),"date_sort":dt})
+        if "fii" in category or "fpi" in category:
+            row.update({"fii_buy":values[0],"fii_sell":values[1],"fii_net":values[2]})
+        elif "dii" in category:
+            row.update({"dii_buy":values[0],"dii_sell":values[1],"dii_net":values[2]})
+    records = []
+    for row in rows.values():
+        if all(k in row for k in ("fii_buy","fii_sell","fii_net","dii_buy","dii_sell","dii_net")):
+            records.append(row)
+    df = pd.DataFrame(records)
+    if df.empty:
+        raise ValueError("NSE response format did not contain matching FII and DII rows.")
+    return df.sort_values("date_sort", ascending=False).drop_duplicates("date_sort")
+
+@st.cache_data(ttl=900, show_spinner=False)
+def fetch_fii_dii():
     try:
-        response = requests.get(url, headers=headers, timeout=25)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, "html.parser")
-        records = []
-        date_pattern = re.compile(r"^\\d{1,2}[- ](?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[- ]\\d{2,4}$", re.I)
-        for table in soup.find_all("table"):
-            for tr in table.find_all("tr"):
-                cells = [cell.get_text(" ", strip=True).replace("₹","").replace("Rs.","").strip() for cell in tr.find_all(["td","th"])]
-                date_cell = next((value for value in cells if date_pattern.match(value)), None)
-                if not date_cell:
-                    continue
-                nums = []
-                for value in cells[cells.index(date_cell)+1:]:
-                    cleaned = value.replace(",","").replace("%","").strip()
-                    if re.fullmatch(r"-?\\d+(?:\\.\\d+)?", cleaned):
-                        nums.append(float(cleaned))
-                if len(nums) >= 6:
-                    parsed_date = pd.to_datetime(date_cell, errors="coerce", dayfirst=True)
-                    if pd.notna(parsed_date):
-                        records.append({"date":parsed_date.strftime("%d-%b-%Y"),"date_sort":parsed_date,
-                            "fii_buy":nums[0],"fii_sell":nums[1],"fii_net":nums[2],
-                            "dii_buy":nums[3],"dii_sell":nums[4],"dii_net":nums[5]})
-        df = pd.DataFrame(records)
-        if df.empty:
-            return df, "Moneycontrol page loaded, but its daily FII/DII table could not be parsed. Check the source website."
-        df = df.sort_values("date_sort", ascending=False).drop_duplicates("date_sort")
-        return df, None
-    except Exception as e:
-        return pd.DataFrame(), f"Moneycontrol retrieval unavailable ({type(e).__name__})."
+        return fetch_moneycontrol_fii_dii(), "Moneycontrol", None, None
+    except Exception as moneycontrol_error:
+        try:
+            return fetch_nse_fii_dii(), "NSE fallback", str(moneycontrol_error), None
+        except Exception as nse_error:
+            return pd.DataFrame(), None, str(moneycontrol_error), str(nse_error)
 
 with tabs[3]:
-    st.subheader("FII / DII tracker · Moneycontrol")
+    st.subheader("FII / DII tracker · Moneycontrol + NSE fallback")
     st.markdown("[Open Moneycontrol FII/DII activity](https://www.moneycontrol.com/stocks/marketstats/fii_dii_activity/) · [NSE official FII/DII report](https://www.nseindia.com/reports/fii-dii)")
-    st.caption("Primary source: Moneycontrol daily cash-market table. Data is published after market close and may be revised. NSE link is provided for cross-checking.")
-    data, error = fetch_fii_dii()
-    if error:
-        st.warning(error)
-        st.info("Use the Moneycontrol page directly or cross-check with the official NSE report. No values are fabricated.")
+    st.caption("Moneycontrol is the preferred source. If it blocks automated access, the tracker tries the NSE report API. Daily cash-market data is generally published after market close and may be revised.")
+    data, source, primary_error, fallback_error = fetch_fii_dii()
+    if data.empty:
+        st.error("FII/DII data is currently unavailable from both sources.")
+        st.caption(f"Moneycontrol: {primary_error} · NSE: {fallback_error}")
+        st.info("Open the source links above to check the latest published figures. No values are fabricated.")
     else:
+        if source == "NSE fallback":
+            st.warning(f"Moneycontrol could not be accessed ({primary_error}). Showing NSE fallback data instead.")
         sessions = st.selectbox("History to display", [5, 10, 20], index=0, format_func=lambda x: f"Last {x} trading sessions")
         history = data.head(sessions).copy().sort_values("date_sort")
         latest = data.iloc[0]
         a,b = st.columns(2)
         a.metric("Latest FII/FPI net (₹ crore)", f"{latest.fii_net:,.2f}")
         b.metric("Latest DII net (₹ crore)", f"{latest.dii_net:,.2f}")
-        st.caption(f"Source: Moneycontrol · Latest available date: {latest.date_sort:%d %b %Y} · {len(history)} trading sessions displayed")
+        st.caption(f"Source: {source} · Latest available date: {latest.date_sort:%d %b %Y} · {len(history)} trading sessions displayed")
         totals = history[["fii_buy","fii_sell","fii_net","dii_buy","dii_sell","dii_net"]].sum()
         c1,c2,c3 = st.columns(3)
         c1.metric(f"FII net · {len(history)} sessions", f"₹{totals.fii_net:,.2f} Cr")
@@ -194,9 +254,9 @@ with tabs[3]:
             "dii_buy":"DII Buy (₹ Cr)","dii_sell":"DII Sell (₹ Cr)","dii_net":"DII Net (₹ Cr)"
         })
         st.dataframe(table.sort_values("Date", ascending=False), use_container_width=True, hide_index=True)
-        st.download_button("Download Moneycontrol FII/DII CSV", table.to_csv(index=False), "moneycontrol_fii_dii.csv", "text/csv")
+        st.download_button("Download FII/DII CSV", table.to_csv(index=False), "fii_dii_history.csv", "text/csv")
         if len(history) < sessions:
-            st.info(f"Moneycontrol returned {len(history)} daily records. The page may currently expose fewer records; no missing sessions are invented.")
+            st.info(f"The selected source returned {len(history)} daily records. No missing sessions are invented.")
 
 with tabs[4]:
     st.subheader("Position sizing and risk")
