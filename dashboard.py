@@ -1,3 +1,4 @@
+import json
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -122,6 +123,71 @@ def rsi(series, n=14):
     rs = gain / loss.replace(0, np.nan)
     return 100 - 100/(1+rs)
 
+
+@st.cache_data(ttl=25, show_spinner=False)
+def get_watchlist_quotes(tickers):
+    """Fetch watchlist quotes in one batch; results may be delayed or unavailable."""
+    if not tickers:
+        return {}
+    try:
+        data = yf.download(
+            tickers=list(tickers),
+            period="5d",
+            interval="5m",
+            group_by="ticker",
+            auto_adjust=True,
+            threads=True,
+            progress=False,
+            timeout=8,
+        )
+    except Exception:
+        return {ticker: None for ticker in tickers}
+
+    quotes = {}
+    for ticker in tickers:
+        try:
+            if isinstance(data.columns, pd.MultiIndex):
+                level0 = data.columns.get_level_values(0)
+                level1 = data.columns.get_level_values(1)
+                if ticker in level0:
+                    frame = data[ticker]
+                elif ticker in level1:
+                    frame = data.xs(ticker, axis=1, level=1)
+                else:
+                    quotes[ticker] = None
+                    continue
+            else:
+                frame = data
+            close = frame["Close"].dropna()
+            if close.empty:
+                quotes[ticker] = None
+                continue
+            latest = float(close.iloc[-1])
+            latest_day = close.index[-1].date()
+            prior = close[close.index.date < latest_day]
+            if not prior.empty:
+                previous = float(prior.iloc[-1])
+            elif len(close) >= 2:
+                previous = float(close.iloc[-2])
+            else:
+                previous = None
+            if previous and previous != 0:
+                quotes[ticker] = (latest, latest - previous, (latest / previous - 1) * 100)
+            else:
+                quotes[ticker] = (latest, None, None)
+        except Exception:
+            quotes[ticker] = None
+    return quotes
+
+
+def ticker_currency(ticker):
+    """Return the native display currency for common Yahoo Finance ticker formats."""
+    if ticker.endswith((".NS", ".BO")):
+        return "₹"
+    if ticker.startswith("^"):
+        return ""
+    return "$"
+
 st.subheader("Market overview")
 st.markdown('<div class="section-note">A quick snapshot of Indian indices, US benchmarks and key macro indicators.</div>', unsafe_allow_html=True)
 with st.spinner("Updating market prices..."):
@@ -154,7 +220,7 @@ with refresh_col:
 with status_col:
     st.caption(f"Last page refresh: {datetime.now(ZoneInfo('Asia/Kolkata')):%I:%M:%S %p IST} · Automatic refresh interval: 30 seconds")
 
-tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "🧮 Options payoff", "🏦 FII / DII", "🛡️ Risk calculator", "📝 Paper journal", "🔗 Resources"])
+tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "🧮 Options payoff", "🏦 FII / DII", "🛡️ Risk calculator", "📝 Paper journal", "🔗 Resources", "⭐ Watchlists"])
 
 with tabs[0]:
     st.subheader("Price charts")
@@ -495,5 +561,156 @@ with tabs[6]:
                     st.markdown(f"- **[{label}]({url})**")
     st.caption(f"{sum(len(items) for items in resource_groups.values())} official resource links across {len(resource_groups)} categories.")
     st.markdown("**Important:** These are links to official institutional websites, not guaranteed live-data feeds or APIs. No broker connection, credentials, or order execution. Options payoff uses manual inputs. Verify prices, expiry dates, lot sizes, and charges with official exchange/broker sources before trading.")
+with tabs[7]:
+    st.subheader("⭐ Favourite stocks & watchlists")
+    st.markdown('<div class="section-note">Keep your preferred Indian and US symbols together and review their latest available quotes.</div>', unsafe_allow_html=True)
+
+    starter_watchlists = {
+        "India starter": ["RELIANCE.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS", "TCS.NS"],
+        "US starter": ["AAPL", "MSFT", "NVDA", "AMZN", "TSLA", "GOOGL", "META"],
+    }
+    if "personal_watchlists" not in st.session_state:
+        st.session_state["personal_watchlists"] = {name: tickers.copy() for name, tickers in starter_watchlists.items()}
+
+    watchlists = st.session_state["personal_watchlists"]
+    if not watchlists:
+        watchlists["My Watchlist"] = []
+
+    top_left, top_right = st.columns([3, 2])
+    with top_left:
+        active_watchlist = st.selectbox("Select watchlist", list(watchlists.keys()), key="active_watchlist")
+    with top_right:
+        st.metric("Saved symbols in this list", len(watchlists.get(active_watchlist, [])))
+
+    with st.form("create_watchlist_form", clear_on_submit=True):
+        new_name_col, create_col = st.columns([3, 1])
+        with new_name_col:
+            new_watchlist_name = st.text_input("Create a watchlist", placeholder="Example: Swing trades")
+        with create_col:
+            st.markdown("<div style='height: 1.85rem'></div>", unsafe_allow_html=True)
+            create_submitted = st.form_submit_button("＋ Create", use_container_width=True)
+        if create_submitted:
+            clean_name = new_watchlist_name.strip()
+            if not clean_name:
+                st.warning("Enter a name for the new watchlist.")
+            elif clean_name in watchlists:
+                st.warning("A watchlist with that name already exists.")
+            elif len(clean_name) > 32:
+                st.warning("Keep watchlist names within 32 characters.")
+            else:
+                watchlists[clean_name] = []
+                st.session_state["personal_watchlists"] = watchlists
+                st.success(f"Created {clean_name}.")
+                st.rerun()
+
+    with st.form("add_watchlist_symbol_form", clear_on_submit=True):
+        add_symbol_col, add_button_col = st.columns([3, 1])
+        with add_symbol_col:
+            new_ticker = st.text_input("Add a stock symbol", placeholder="RELIANCE.NS, AAPL, MSFT")
+        with add_button_col:
+            st.markdown("<div style='height: 1.85rem'></div>", unsafe_allow_html=True)
+            add_submitted = st.form_submit_button("＋ Add stock", use_container_width=True)
+        if add_submitted:
+            ticker = new_ticker.strip().upper()
+            valid_ticker = bool(ticker) and len(ticker) <= 24 and all(ch.isalnum() or ch in ".-^=" for ch in ticker)
+            if not valid_ticker:
+                st.warning("Enter one valid Yahoo Finance ticker, for example RELIANCE.NS or AAPL.")
+            elif ticker in watchlists[active_watchlist]:
+                st.info(f"{ticker} is already in {active_watchlist}.")
+            else:
+                watchlists[active_watchlist].append(ticker)
+                st.session_state["personal_watchlists"] = watchlists
+                st.success(f"Added {ticker} to {active_watchlist}.")
+                st.rerun()
+
+    current_tickers = watchlists.get(active_watchlist, [])
+    manage_left, manage_right = st.columns([3, 1])
+    with manage_left:
+        remove_ticker = st.selectbox("Remove a symbol", ["Select a symbol"] + current_tickers, key="remove_watchlist_ticker")
+    with manage_right:
+        st.markdown("<div style='height: 1.85rem'></div>", unsafe_allow_html=True)
+        if st.button("Remove", use_container_width=True, disabled=remove_ticker == "Select a symbol"):
+            watchlists[active_watchlist].remove(remove_ticker)
+            st.session_state["personal_watchlists"] = watchlists
+            st.session_state.pop("remove_watchlist_ticker", None)
+            st.rerun()
+
+    st.markdown("#### Live watchlist snapshot")
+    if current_tickers:
+        with st.spinner("Loading watchlist quotes..."):
+            watchlist_quotes = get_watchlist_quotes(tuple(current_tickers))
+        watchlist_rows = []
+        for ticker in current_tickers:
+            quote = watchlist_quotes.get(ticker)
+            currency = ticker_currency(ticker)
+            if quote:
+                price = f"{currency}{quote[0]:,.2f}"
+                change = f"{currency}{quote[1]:+,.2f}" if quote[1] is not None else "—"
+                change_pct = f"{quote[2]:+.2f}%" if quote[2] is not None else "—"
+                status = "Quote available"
+            else:
+                price, change, change_pct, status = "Unavailable", "—", "—", "No quote returned"
+            market = "India" if ticker.endswith((".NS", ".BO")) else ("Index" if ticker.startswith("^") else "US / international")
+            watchlist_rows.append({
+                "Symbol": ticker,
+                "Market": market,
+                "Last price": price,
+                "Change": change,
+                "Change %": change_pct,
+                "Data status": status,
+            })
+        st.dataframe(pd.DataFrame(watchlist_rows), use_container_width=True, hide_index=True)
+        st.caption("Watchlist quotes use the existing Yahoo Finance source and may be delayed, stale or unavailable. The dashboard refreshes every 30 seconds; watchlist quotes are cached for up to 25 seconds.")
+    else:
+        st.info("This watchlist is empty. Add a ticker above to start tracking it.")
+
+    with st.expander("Backup and restore watchlists"):
+        st.caption("Watchlists are held in this active Streamlit session. Download a JSON backup to keep them, then upload that file to restore them in a later session.")
+        watchlist_json = json.dumps(watchlists, indent=2)
+        st.download_button(
+            "Download watchlists backup",
+            data=watchlist_json,
+            file_name="rakesh_market_watchlists.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+        uploaded_watchlists = st.file_uploader("Restore watchlists from JSON", type=["json"], key="watchlist_restore_upload")
+        if uploaded_watchlists is not None and st.button("Restore uploaded watchlists", key="restore_watchlists_button"):
+            try:
+                restored = json.loads(uploaded_watchlists.getvalue().decode("utf-8"))
+                if not isinstance(restored, dict) or not restored:
+                    raise ValueError("The file must contain a non-empty object of watchlist names and ticker lists.")
+                cleaned = {}
+                for name, tickers in restored.items():
+                    if not isinstance(name, str) or not name.strip() or not isinstance(tickers, list):
+                        raise ValueError("Each watchlist must have a name and a list of ticker symbols.")
+                    clean_tickers = []
+                    for item in tickers:
+                        ticker = str(item).strip().upper()
+                        if ticker and len(ticker) <= 24 and all(ch.isalnum() or ch in ".-^=" for ch in ticker) and ticker not in clean_tickers:
+                            clean_tickers.append(ticker)
+                    cleaned[name.strip()[:32]] = clean_tickers
+                if not cleaned:
+                    raise ValueError("No valid watchlists were found.")
+                st.session_state["personal_watchlists"] = cleaned
+                st.success("Watchlists restored successfully.")
+                st.rerun()
+            except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+                st.error(f"Could not restore this backup: {error}")
+
+    with st.expander("Delete a watchlist"):
+        deletable_lists = list(watchlists.keys())
+        if len(deletable_lists) > 1:
+            list_to_delete = st.selectbox("Choose a watchlist to delete", deletable_lists, key="delete_watchlist_choice")
+            if st.button("Delete selected watchlist", key="delete_watchlist_button"):
+                del watchlists[list_to_delete]
+                st.session_state["personal_watchlists"] = watchlists
+                st.session_state.pop("active_watchlist", None)
+                st.session_state.pop("remove_watchlist_ticker", None)
+                st.session_state.pop("delete_watchlist_choice", None)
+                st.rerun()
+        else:
+            st.caption("Keep at least one watchlist. You can remove all its symbols instead.")
+
 st.divider()
 st.caption("Rakesh Market Analysis · Educational research and paper trading only · Not investment advice")
