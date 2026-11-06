@@ -10,6 +10,28 @@ from zoneinfo import ZoneInfo
 from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Rakesh Market Analysis", page_icon="📈", layout="wide")
+
+# ---------- Temporary maintenance switch (controlled in Streamlit Cloud Secrets) ----------
+try:
+    maintenance_mode = st.secrets["app"]["maintenance_mode"]
+except (KeyError, FileNotFoundError):
+    maintenance_mode = False
+
+if maintenance_mode:
+    st.markdown("""
+    <div style="max-width:760px;margin:12vh auto 0;padding:3rem 2rem;text-align:center;
+                background:linear-gradient(145deg,#152744,#101b30);border:1px solid #2a4261;
+                border-radius:20px;color:#f2f6fc;">
+      <div style="font-size:3rem;">🛠️</div>
+      <h1 style="margin:.6rem 0;">Temporarily under maintenance</h1>
+      <p style="color:#b5c5d9;font-size:1.05rem;">
+        Rakesh Market Analysis is being updated. Please check back soon.
+      </p>
+      <p style="color:#8fb8df;font-size:.85rem;">Thank you for your patience.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    st.stop()
+
 st_autorefresh(interval=30_000, key="market_refresh")
 
 # ---------- Visual system: compact, clear, and responsive ----------
