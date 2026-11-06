@@ -79,33 +79,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ---------- Compact bull vs bear market illustration ----------
-st.markdown("""
-<div style="display:flex;align-items:center;justify-content:flex-end;gap:18px;
-            max-width:430px;margin:0 0 1rem auto;padding:10px 16px;
-            background:linear-gradient(110deg,#111a2b,#152744);border:1px solid #263650;
-            border-radius:14px;">
-  <div style="text-align:center;flex:1;color:#34d399;font-weight:700;font-size:.78rem;">
-    <svg viewBox="0 0 120 74" width="100%" height="64" role="img" aria-label="Bull market icon">
-      <path d="M25 28 Q8 8 4 18 Q13 35 31 37 M95 28 Q112 8 116 18 Q107 35 89 37" fill="none" stroke="#34d399" stroke-width="5" stroke-linecap="round"/>
-      <path d="M28 25 Q60 8 92 25 L87 53 Q60 73 33 53Z" fill="#064e3b" stroke="#34d399" stroke-width="3"/>
-      <path d="M42 35h7 M71 35h7 M51 51q9 8 18 0" fill="none" stroke="#a7f3d0" stroke-width="4" stroke-linecap="round"/>
-      <path d="M60 4v-3 M52 12l-8-7 M68 12l8-7" stroke="#34d399" stroke-width="3" stroke-linecap="round"/>
-    </svg>
-    BULLISH
-  </div>
-  <div style="width:1px;height:68px;background:#34445d;"></div>
-  <div style="text-align:center;flex:1;color:#fb7185;font-weight:700;font-size:.78rem;">
-    <svg viewBox="0 0 120 74" width="100%" height="64" role="img" aria-label="Bear market icon">
-      <path d="M29 25 Q8 4 8 25 Q12 39 32 38 M91 25 Q112 4 112 25 Q108 39 88 38" fill="#7f1d1d" stroke="#fb7185" stroke-width="4"/>
-      <path d="M28 24 Q60 8 92 24 L88 52 Q60 72 32 52Z" fill="#7f1d1d" stroke="#fb7185" stroke-width="3"/>
-      <path d="M42 35h7 M71 35h7 M50 53q10-7 20 0" fill="none" stroke="#fecdd3" stroke-width="4" stroke-linecap="round"/>
-      <path d="M60 4v-3 M52 12l-8-7 M68 12l8-7" stroke="#fb7185" stroke-width="3" stroke-linecap="round"/>
-    </svg>
-    BEARISH
-  </div>
-</div>
-""", unsafe_allow_html=True)
 with st.expander("About market data & important limitations", expanded=False):
     st.info("Market prices use Yahoo Finance intraday data where available. It is unofficial, may be delayed or unavailable, and is not guaranteed exchange real-time data. This dashboard is for research and paper trading, not investment advice.")
 
@@ -242,6 +215,79 @@ st.subheader("Market overview")
 st.markdown('<div class="section-note">A quick snapshot of Indian indices, US benchmarks and key macro indicators.</div>', unsafe_allow_html=True)
 with st.spinner("Updating market prices..."):
     quotes = get_market_quotes()
+
+# ---------- Live NIFTY 50 bull vs bear battle ----------
+nifty_battle_quote = quotes.get("NIFTY 50")
+nifty_battle_change = nifty_battle_quote[2] if nifty_battle_quote else None
+if nifty_battle_change is not None and nifty_battle_change > 0:
+    battle_mode = "bear"
+    battle_label = "NIFTY 50 IS UP"
+    battle_caption = "The bear charges and lands a hit on the bull!"
+    battle_color = "#fb7185"
+elif nifty_battle_change is not None and nifty_battle_change < 0:
+    battle_mode = "bull"
+    battle_label = "NIFTY 50 IS DOWN"
+    battle_caption = "The bull charges and lands a hit on the bear!"
+    battle_color = "#34d399"
+else:
+    battle_mode = "neutral"
+    battle_label = "MARKET IS NEUTRAL"
+    battle_caption = "Both opponents are holding their ground."
+    battle_color = "#93a4bd"
+
+st.markdown(f"""
+<style>
+.battle-card {{
+  position:relative; overflow:hidden; border:1px solid #263650; border-radius:16px;
+  background:radial-gradient(ellipse at 50% 110%,#24344c 0%,#111a2b 55%,#0b1020 100%);
+  padding:12px 16px 10px; margin:0 0 18px;
+}}
+.battle-head {{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}}
+.battle-title {{font-size:.88rem;font-weight:800;letter-spacing:.08em;color:#e5edf8;}}
+.battle-signal {{font-size:.72rem;font-weight:800;color:{battle_color};border:1px solid {battle_color};
+  border-radius:30px;padding:4px 10px;}}
+.battle-stage {{height:118px;position:relative;display:flex;align-items:center;justify-content:space-between;
+  max-width:620px;margin:2px auto 0;}}
+.battle-stage:before {{content:"";position:absolute;left:5%;right:5%;bottom:14px;height:2px;
+  background:linear-gradient(90deg,#34d399,#43516a,#fb7185);opacity:.8;}}
+.fighter {{position:relative;z-index:2;font-size:clamp(3.6rem,8vw,5.2rem);line-height:1;
+  filter:drop-shadow(0 8px 9px #0009);}}
+.fighter.bull {{transform:scaleX(-1);}}
+.fighter.bear {{transform:scaleX(1);}}
+.battle-stage.bear-wins .bear {{animation:bearCharge 1.25s ease-in-out infinite alternate;}}
+.battle-stage.bear-wins .bull {{animation:bullHit 1.25s ease-in-out infinite;}}
+.battle-stage.bull-wins .bull {{animation:bullCharge 1.25s ease-in-out infinite alternate;}}
+.battle-stage.bull-wins .bear {{animation:bearHit 1.25s ease-in-out infinite;}}
+.battle-stage.neutral .bull {{animation:idleBull 1.8s ease-in-out infinite;}}
+.battle-stage.neutral .bear {{animation:idleBear 1.8s ease-in-out infinite;}}
+.impact {{position:absolute;z-index:3;left:50%;top:34%;font-size:1.65rem;opacity:0;
+  transform:translate(-50%,-50%);}}
+.bear-wins .impact,.bull-wins .impact {{animation:impact 1.25s infinite;}}
+.battle-caption {{text-align:center;color:#b8c6d9;font-size:.78rem;margin-top:0;}}
+.battle-foot {{text-align:center;color:#7f91aa;font-size:.67rem;margin-top:3px;}}
+@keyframes bearCharge {{from{{transform:translateX(0) scale(1)}}to{{transform:translateX(-35px) scale(1.12)}}}}
+@keyframes bullCharge {{from{{transform:translateX(0) scaleX(-1) scale(1)}}to{{transform:translateX(35px) scaleX(-1) scale(1.12)}}}}
+@keyframes bullHit {{0%,35%{{transform:translateX(0) scaleX(-1) rotate(0)}}55%{{transform:translateX(-28px) scaleX(-1) rotate(-18deg)}}100%{{transform:translateX(0) scaleX(-1) rotate(0)}}}}
+@keyframes bearHit {{0%,35%{{transform:translateX(0) rotate(0)}}55%{{transform:translateX(28px) rotate(18deg)}}100%{{transform:translateX(0) rotate(0)}}}}
+@keyframes impact {{0%,35%{{opacity:0;transform:translate(-50%,-50%) scale(.4)}}48%{{opacity:1;transform:translate(-50%,-50%) scale(1.35)}}70%,100%{{opacity:0;transform:translate(-50%,-50%) scale(.7)}}}}
+@keyframes idleBull {{50%{{transform:translateY(-5px) scaleX(-1)}}}}
+@keyframes idleBear {{50%{{transform:translateY(-5px)}}}}
+@media (prefers-reduced-motion:reduce) {{.fighter,.impact{{animation:none!important}}}}
+</style>
+<div class="battle-card">
+  <div class="battle-head">
+    <div class="battle-title">⚔️ LIVE MARKET BATTLE</div>
+    <div class="battle-signal">{battle_label} · {nifty_battle_change:+.2f}%</div>
+  </div>
+  <div class="battle-stage {battle_mode}-wins">
+    <div class="fighter bull" aria-label="Bull">🐂</div>
+    <div class="impact">💥</div>
+    <div class="fighter bear" aria-label="Bear">🐻</div>
+  </div>
+  <div class="battle-caption">{battle_caption}</div>
+  <div class="battle-foot">Battle signal: NIFTY 50 · Yahoo Finance quote · refreshes every 30 seconds</div>
+</div>
+""", unsafe_allow_html=True)
 
 def render_market_group(title, names, columns=4):
     st.markdown(f'<div class="market-heading">{title}</div>', unsafe_allow_html=True)
