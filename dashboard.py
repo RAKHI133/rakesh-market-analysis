@@ -78,6 +78,34 @@ st.markdown(f"""
   <div class="hero-sub">{now_ist:%A, %d %b %Y} · {now_ist:%I:%M:%S %p} IST &nbsp;|&nbsp; Refreshes every 30 seconds</div>
 </div>
 """, unsafe_allow_html=True)
+
+# ---------- Compact bull vs bear market illustration ----------
+st.markdown("""
+<div style="display:flex;align-items:center;justify-content:flex-end;gap:18px;
+            max-width:430px;margin:0 0 1rem auto;padding:10px 16px;
+            background:linear-gradient(110deg,#111a2b,#152744);border:1px solid #263650;
+            border-radius:14px;">
+  <div style="text-align:center;flex:1;color:#34d399;font-weight:700;font-size:.78rem;">
+    <svg viewBox="0 0 120 74" width="100%" height="64" role="img" aria-label="Bull market icon">
+      <path d="M25 28 Q8 8 4 18 Q13 35 31 37 M95 28 Q112 8 116 18 Q107 35 89 37" fill="none" stroke="#34d399" stroke-width="5" stroke-linecap="round"/>
+      <path d="M28 25 Q60 8 92 25 L87 53 Q60 73 33 53Z" fill="#064e3b" stroke="#34d399" stroke-width="3"/>
+      <path d="M42 35h7 M71 35h7 M51 51q9 8 18 0" fill="none" stroke="#a7f3d0" stroke-width="4" stroke-linecap="round"/>
+      <path d="M60 4v-3 M52 12l-8-7 M68 12l8-7" stroke="#34d399" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+    BULLISH
+  </div>
+  <div style="width:1px;height:68px;background:#34445d;"></div>
+  <div style="text-align:center;flex:1;color:#fb7185;font-weight:700;font-size:.78rem;">
+    <svg viewBox="0 0 120 74" width="100%" height="64" role="img" aria-label="Bear market icon">
+      <path d="M29 25 Q8 4 8 25 Q12 39 32 38 M91 25 Q112 4 112 25 Q108 39 88 38" fill="#7f1d1d" stroke="#fb7185" stroke-width="4"/>
+      <path d="M28 24 Q60 8 92 24 L88 52 Q60 72 32 52Z" fill="#7f1d1d" stroke="#fb7185" stroke-width="3"/>
+      <path d="M42 35h7 M71 35h7 M50 53q10-7 20 0" fill="none" stroke="#fecdd3" stroke-width="4" stroke-linecap="round"/>
+      <path d="M60 4v-3 M52 12l-8-7 M68 12l8-7" stroke="#fb7185" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+    BEARISH
+  </div>
+</div>
+""", unsafe_allow_html=True)
 with st.expander("About market data & important limitations", expanded=False):
     st.info("Market prices use Yahoo Finance intraday data where available. It is unofficial, may be delayed or unavailable, and is not guaranteed exchange real-time data. This dashboard is for research and paper trading, not investment advice.")
 
