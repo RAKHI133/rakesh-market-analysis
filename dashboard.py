@@ -632,6 +632,7 @@ with tabs[7]:
         if st.button("Remove", use_container_width=True, disabled=remove_ticker == "Select a symbol"):
             watchlists[active_watchlist].remove(remove_ticker)
             st.session_state["personal_watchlists"] = watchlists
+            st.session_state.pop("remove_watchlist_ticker", None)
             st.rerun()
 
     st.markdown("#### Live watchlist snapshot")
@@ -704,6 +705,9 @@ with tabs[7]:
             if st.button("Delete selected watchlist", key="delete_watchlist_button"):
                 del watchlists[list_to_delete]
                 st.session_state["personal_watchlists"] = watchlists
+                st.session_state.pop("active_watchlist", None)
+                st.session_state.pop("remove_watchlist_ticker", None)
+                st.session_state.pop("delete_watchlist_choice", None)
                 st.rerun()
         else:
             st.caption("Keep at least one watchlist. You can remove all its symbols instead.")
