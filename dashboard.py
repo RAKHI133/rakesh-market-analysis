@@ -68,14 +68,18 @@ def get_history(symbol, period="6mo", interval="1d"):
 
 symbols = {
     "NIFTY 50":"^NSEI", "NIFTY BANK":"^NSEBANK", "SENSEX":"^BSESN",
-    "INDIA VIX":"^INDIAVIX", "S&P 500":"^GSPC", "NASDAQ":"^IXIC",
-    "WTI Crude":"CL=F", "USD/INR":"INR=X"
+    "INDIA VIX":"^INDIAVIX", "S&P 500":"^GSPC", "NASDAQ":"^IXIC", "DOW JONES":"^DJI",
+    "Apple (AAPL)":"AAPL", "Microsoft (MSFT)":"MSFT", "NVIDIA (NVDA)":"NVDA",
+    "Amazon (AMZN)":"AMZN", "Tesla (TSLA)":"TSLA", "Alphabet (GOOGL)":"GOOGL", "Meta (META)":"META",
+    "WTI Crude":"CL=F", "Brent Crude":"BZ=F", "USD/INR":"INR=X"
 }
 # Values are displayed in their native market convention. Index values are points, not currency.
 QUOTE_FORMAT = {
     "NIFTY 50": ("", "pts"), "NIFTY BANK": ("", "pts"), "SENSEX": ("", "pts"),
-    "INDIA VIX": ("", ""), "S&P 500": ("", "pts"), "NASDAQ": ("", "pts"),
-    "WTI Crude": ("$", "/barrel"), "USD/INR": ("₹", "per USD"),
+    "INDIA VIX": ("", ""), "S&P 500": ("", "pts"), "NASDAQ": ("", "pts"), "DOW JONES": ("", "pts"),
+    "Apple (AAPL)": ("$", ""), "Microsoft (MSFT)": ("$", ""), "NVIDIA (NVDA)": ("$", ""),
+    "Amazon (AMZN)": ("$", ""), "Tesla (TSLA)": ("$", ""), "Alphabet (GOOGL)": ("$", ""), "Meta (META)": ("$", ""),
+    "WTI Crude": ("$", "/barrel"), "Brent Crude": ("$", "/barrel"), "USD/INR": ("₹", "per USD"),
 }
 
 @st.cache_data(ttl=25, show_spinner=False)
@@ -138,8 +142,9 @@ def render_market_group(title, names, columns=4):
                 st.metric(name, "Unavailable")
 
 render_market_group("🇮🇳 Indian markets", ["NIFTY 50", "NIFTY BANK", "SENSEX", "INDIA VIX"])
-render_market_group("🇺🇸 US markets", ["S&P 500", "NASDAQ"])
-render_market_group("🌐 Commodities & currency", ["WTI Crude", "USD/INR"], columns=2)
+render_market_group("🇺🇸 US market indices", ["S&P 500", "NASDAQ", "DOW JONES"], columns=3)
+render_market_group("🇺🇸 US stocks · USD", ["Apple (AAPL)", "Microsoft (MSFT)", "NVIDIA (NVDA)", "Amazon (AMZN)", "Tesla (TSLA)", "Alphabet (GOOGL)", "Meta (META)"], columns=4)
+render_market_group("🌐 Commodities & currency", ["WTI Crude", "Brent Crude", "USD/INR"], columns=3)
 st.caption("Indices are shown in points. WTI Crude is shown in USD per barrel; USD/INR is rupees per US dollar. Quotes depend on Yahoo Finance availability and may be delayed.")
 refresh_col, status_col = st.columns([1, 4])
 with refresh_col:
@@ -154,13 +159,25 @@ tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "🧮 Options payoff", "�
 with tabs[0]:
     st.subheader("Price charts")
     st.markdown('<div class="section-note">Explore price history, moving averages, RSI and volume.</div>', unsafe_allow_html=True)
-    chart_symbols = {"NIFTY 50":"^NSEI","NIFTY BANK":"^NSEBANK","SENSEX":"^BSESN","RELIANCE":"RELIANCE.NS","HDFCBANK":"HDFCBANK.NS","ICICIBANK":"ICICIBANK.NS","INFY":"INFY.NS","TCS":"TCS.NS","SBIN":"SBIN.NS"}
+    chart_symbols = {"NIFTY 50":"^NSEI","NIFTY BANK":"^NSEBANK","SENSEX":"^BSESN","RELIANCE":"RELIANCE.NS","HDFCBANK":"HDFCBANK.NS","ICICIBANK":"ICICIBANK.NS","INFY":"INFY.NS","TCS":"TCS.NS","SBIN":"SBIN.NS",
+                     "AAPL · Apple":"AAPL","MSFT · Microsoft":"MSFT","NVDA · NVIDIA":"NVDA","AMZN · Amazon":"AMZN","TSLA · Tesla":"TSLA","GOOGL · Alphabet":"GOOGL","META · Meta":"META"}
     instrument = st.selectbox("Instrument", list(chart_symbols))
+    chart_symbol = chart_symbols[instrument]
+    if chart_symbol in {"AAPL","MSFT","NVDA","AMZN","TSLA","GOOGL","META"}:
+        chart_currency = "$"
+        currency_label = "USD ($)"
+    elif chart_symbol.endswith((".NS", ".BO")):
+        chart_currency = "₹"
+        currency_label = "INR (₹)"
+    else:
+        chart_currency = ""
+        currency_label = "index points"
+    st.caption("Selected instrument: " + instrument + " · Display currency: " + currency_label)
     period = st.selectbox("Period", ["1d","5d","1mo","3mo","6mo","1y","2y"], index=2)
     interval = st.selectbox("Interval", ["1m","5m","15m","1d"], index=3)
     if period not in ["1d","5d"]:
         interval = "1d"
-    chart_key = (chart_symbols[instrument], period, interval)
+    chart_key = (chart_symbol, period, interval)
     if st.button("Load chart", key="load_chart"):
         with st.spinner("Loading chart data..."):
             chart_frame = get_history(*chart_key)
@@ -177,7 +194,7 @@ with tabs[0]:
             fig.add_trace(go.Candlestick(x=d.index, open=d.Open, high=d.High, low=d.Low, close=d.Close, name="Price"))
             fig.add_trace(go.Scatter(x=d.index, y=d.SMA20, name="SMA 20"))
             fig.add_trace(go.Scatter(x=d.index, y=d.SMA50, name="SMA 50"))
-            fig.update_layout(height=480, xaxis_rangeslider_visible=False, template="plotly_dark", paper_bgcolor="#101827", plot_bgcolor="#101827", margin=dict(l=12,r=12,t=35,b=12), legend=dict(orientation="h", y=1.02))
+            fig.update_layout(height=480, xaxis_rangeslider_visible=False, template="plotly_dark", paper_bgcolor="#101827", plot_bgcolor="#101827", yaxis_tickprefix=chart_currency, margin=dict(l=12,r=12,t=35,b=12), legend=dict(orientation="h", y=1.02))
             st.plotly_chart(fig, use_container_width=True)
             c1,c2 = st.columns(2)
             with c1: st.line_chart(rsi(d.Close).rename("RSI 14"))
@@ -189,7 +206,14 @@ with tabs[0]:
 with tabs[1]:
     st.subheader("Technical scanner")
     st.markdown('<div class="section-note">Compare selected symbols using the existing SMA and RSI checks.</div>', unsafe_allow_html=True)
-    raw = st.text_input("Yahoo symbols, comma-separated", "RELIANCE.NS,HDFCBANK.NS,ICICIBANK.NS,INFY.NS,TCS.NS,SBIN.NS,ITC.NS,LT.NS")
+    scanner_presets = {
+        "Indian large caps": "RELIANCE.NS,HDFCBANK.NS,ICICIBANK.NS,INFY.NS,TCS.NS,SBIN.NS,ITC.NS,LT.NS",
+        "US mega-cap stocks": "AAPL,MSFT,NVDA,AMZN,TSLA,GOOGL,META",
+        "Custom symbols": ""
+    }
+    scanner_preset = st.radio("Watchlist preset", list(scanner_presets), horizontal=True)
+    raw = st.text_input("Yahoo symbols, comma-separated", scanner_presets[scanner_preset], key="scanner_symbols_" + scanner_preset)
+    st.caption("Use Yahoo Finance ticker format. Indian equities usually end in .NS or .BO; US stocks use tickers such as AAPL and NVDA.")
     if st.button("Run scanner"):
         rows = []
         for symbol in [x.strip().upper() for x in raw.split(",") if x.strip()]:
@@ -198,7 +222,20 @@ with tabs[1]:
                 c = d.Close.dropna()
                 s20 = c.rolling(20).mean().iloc[-1]
                 s50 = c.rolling(50).mean().iloc[-1] if len(c) >= 50 else np.nan
-                rows.append({"Symbol":symbol,"Close":round(float(c.iloc[-1]),2),"SMA20":round(float(s20),2),"SMA50":round(float(s50),2) if pd.notna(s50) else None,"RSI14":round(float(rsi(c).iloc[-1]),1)})
+                last_close = float(c.iloc[-1])
+                if symbol.endswith((".NS", ".BO")):
+                    currency = "₹"
+                elif symbol.startswith("^"):
+                    currency = ""
+                else:
+                    currency = "$"
+                if pd.notna(s50) and last_close > s20 > s50:
+                    trend = "Bullish trend"
+                elif pd.notna(s50) and last_close < s20 < s50:
+                    trend = "Bearish trend"
+                else:
+                    trend = "Mixed / neutral"
+                rows.append({"Symbol":symbol,"Price":f"{currency}{last_close:,.2f}","SMA20":f"{currency}{float(s20):,.2f}","SMA50":f"{currency}{float(s50):,.2f}" if pd.notna(s50) else "—","RSI14":round(float(rsi(c).iloc[-1]),1),"Trend":trend})
         if rows:
             result = pd.DataFrame(rows)
             st.dataframe(result, use_container_width=True, hide_index=True)
