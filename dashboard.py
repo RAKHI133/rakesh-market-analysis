@@ -10,9 +10,53 @@ from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Rakesh Market Analysis", page_icon="📈", layout="wide")
 st_autorefresh(interval=30_000, key="market_refresh")
-st.title("🇮🇳 Rakesh Market Analysis")
-st.caption(f"India time: {datetime.now(ZoneInfo('Asia/Kolkata')):%d %b %Y, %I:%M:%S %p} IST · Auto-refreshes every 30 seconds")
-st.warning("Market prices use Yahoo Finance intraday data where available. It is unofficial, may be delayed or unavailable, and is not guaranteed exchange real-time data. This dashboard is for research and paper trading, not investment advice.")
+
+# ---------- Visual system: compact, clear, and responsive ----------
+st.markdown("""
+<style>
+  :root { color-scheme: dark; }
+  .block-container { max-width: 1480px; padding-top: 1.35rem; padding-bottom: 2.5rem; }
+  [data-testid="stAppViewContainer"] { background: #0b1020; }
+  [data-testid="stHeader"] { background: rgba(11,16,32,.88); }
+  [data-testid="stSidebar"] { background: #10182b; border-right: 1px solid #24314a; }
+  h1, h2, h3 { letter-spacing: -.025em; }
+  h1 { font-size: clamp(1.7rem, 3vw, 2.35rem) !important; }
+  [data-testid="stMetric"] {
+    background: linear-gradient(145deg,#151f34,#111a2b);
+    border: 1px solid #263650; border-radius: 14px;
+    padding: 14px 16px; min-height: 112px;
+  }
+  [data-testid="stMetricLabel"] { color: #a8b7ce !important; font-size: .86rem; }
+  [data-testid="stMetricValue"] { font-size: clamp(1.2rem,2vw,1.8rem); }
+  [data-testid="stMetricDelta"] { font-size: .82rem; }
+  div[data-testid="stTabs"] button[role="tab"] { padding: .7rem .9rem; }
+  div[data-testid="stTabs"] button[aria-selected="true"] { color: #7dd3fc; }
+  .hero {
+    background: linear-gradient(115deg,#152744 0%,#101b30 58%,#102a35 100%);
+    border: 1px solid #2a4261; border-radius: 18px;
+    padding: 1.15rem 1.35rem; margin: .25rem 0 1.1rem;
+  }
+  .hero-kicker { color:#8fb8df; text-transform:uppercase; letter-spacing:.13em; font-size:.72rem; font-weight:700; }
+  .hero-title { color:#f2f6fc; font-size:1.55rem; font-weight:750; margin:.2rem 0; }
+  .hero-sub { color:#b5c5d9; font-size:.9rem; }
+  .section-note { color:#91a3bb; font-size:.82rem; margin-top:-.45rem; }
+  .market-heading { color:#d9e6f5; font-size:1rem; font-weight:700; margin:.85rem 0 .45rem; }
+  .stButton button, .stDownloadButton button { border-radius:10px; }
+  [data-testid="stDataFrame"] { border:1px solid #263650; border-radius:12px; overflow:hidden; }
+  hr { border-color:#263650; }
+</style>
+""", unsafe_allow_html=True)
+
+now_ist = datetime.now(ZoneInfo("Asia/Kolkata"))
+st.markdown(f"""
+<div class="hero">
+  <div class="hero-kicker">Personal market terminal · India</div>
+  <div class="hero-title">📈 Rakesh Market Analysis</div>
+  <div class="hero-sub">{now_ist:%A, %d %b %Y} · {now_ist:%I:%M:%S %p} IST &nbsp;|&nbsp; Refreshes every 30 seconds</div>
+</div>
+""", unsafe_allow_html=True)
+with st.expander("About market data & important limitations", expanded=False):
+    st.info("Market prices use Yahoo Finance intraday data where available. It is unofficial, may be delayed or unavailable, and is not guaranteed exchange real-time data. This dashboard is for research and paper trading, not investment advice.")
 
 @st.cache_data(ttl=30, show_spinner=False)
 def get_history(symbol, period="6mo", interval="1d"):
@@ -21,6 +65,18 @@ def get_history(symbol, period="6mo", interval="1d"):
         return data.dropna(how="all") if data is not None else pd.DataFrame()
     except Exception:
         return pd.DataFrame()
+
+symbols = {
+    "NIFTY 50":"^NSEI", "NIFTY BANK":"^NSEBANK", "SENSEX":"^BSESN",
+    "INDIA VIX":"^INDIAVIX", "S&P 500":"^GSPC", "NASDAQ":"^IXIC",
+    "WTI Crude":"CL=F", "USD/INR":"INR=X"
+}
+# Values are displayed in their native market convention. Index values are points, not currency.
+QUOTE_FORMAT = {
+    "NIFTY 50": ("", "pts"), "NIFTY BANK": ("", "pts"), "SENSEX": ("", "pts"),
+    "INDIA VIX": ("", ""), "S&P 500": ("", "pts"), "NASDAQ": ("", "pts"),
+    "WTI Crude": ("$", "/barrel"), "USD/INR": ("₹", "per USD"),
+}
 
 @st.cache_data(ttl=25, show_spinner=False)
 def get_market_quotes():
@@ -62,31 +118,42 @@ def rsi(series, n=14):
     rs = gain / loss.replace(0, np.nan)
     return 100 - 100/(1+rs)
 
-symbols = {
-    "NIFTY 50":"^NSEI", "NIFTY BANK":"^NSEBANK", "SENSEX":"^BSESN",
-    "INDIA VIX":"^INDIAVIX", "S&P 500":"^GSPC", "NASDAQ":"^IXIC",
-    "WTI Crude":"CL=F", "USD/INR":"INR=X"
-}
 st.subheader("Market overview")
-# Refresh runs automatically with the 30-second page timer. Results are cached briefly.
+st.markdown('<div class="section-note">A quick snapshot of Indian indices, US benchmarks and key macro indicators.</div>', unsafe_allow_html=True)
 with st.spinner("Updating market prices..."):
     quotes = get_market_quotes()
-cols = st.columns(4)
-for i, (name, symbol) in enumerate(symbols.items()):
-    q = quotes.get(name)
-    with cols[i % 4]:
-        if q:
-            st.metric(name, f"{q[0]:,.2f}", f"{q[1]:+,.2f} ({q[2]:+.2f}%)")
-        else:
-            st.metric(name, "Unavailable")
-st.caption("Market overview refreshes automatically every 30 seconds. Prices depend on Yahoo Finance availability and may be delayed.")
-if st.button("Refresh data now", key="clear_market_data"):
-    st.cache_data.clear()
-    st.rerun()
 
-tabs = st.tabs(["Charts", "Stock scanner", "Options payoff", "FII / DII", "Risk calculator", "Paper journal", "Resources"])
+def render_market_group(title, names, columns=4):
+    st.markdown(f'<div class="market-heading">{title}</div>', unsafe_allow_html=True)
+    cols = st.columns(columns)
+    for i, name in enumerate(names):
+        q = quotes.get(name)
+        prefix, suffix = QUOTE_FORMAT.get(name, ("", ""))
+        with cols[i % columns]:
+            if q:
+                value = f"{prefix}{q[0]:,.2f}" + (f" {suffix}" if suffix else "")
+                delta = f"{q[1]:+,.2f} ({q[2]:+.2f}%)"
+                st.metric(name, value, delta)
+            else:
+                st.metric(name, "Unavailable")
+
+render_market_group("🇮🇳 Indian markets", ["NIFTY 50", "NIFTY BANK", "SENSEX", "INDIA VIX"])
+render_market_group("🇺🇸 US markets", ["S&P 500", "NASDAQ"])
+render_market_group("🌐 Commodities & currency", ["WTI Crude", "USD/INR"], columns=2)
+st.caption("Indices are shown in points. WTI Crude is shown in USD per barrel; USD/INR is rupees per US dollar. Quotes depend on Yahoo Finance availability and may be delayed.")
+refresh_col, status_col = st.columns([1, 4])
+with refresh_col:
+    if st.button("↻ Refresh data now", key="clear_market_data", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+with status_col:
+    st.caption(f"Last page refresh: {datetime.now(ZoneInfo('Asia/Kolkata')):%I:%M:%S %p IST} · Automatic refresh interval: 30 seconds")
+
+tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "🧮 Options payoff", "🏦 FII / DII", "🛡️ Risk calculator", "📝 Paper journal", "🔗 Resources"])
 
 with tabs[0]:
+    st.subheader("Price charts")
+    st.markdown('<div class="section-note">Explore price history, moving averages, RSI and volume.</div>', unsafe_allow_html=True)
     chart_symbols = {"NIFTY 50":"^NSEI","NIFTY BANK":"^NSEBANK","SENSEX":"^BSESN","RELIANCE":"RELIANCE.NS","HDFCBANK":"HDFCBANK.NS","ICICIBANK":"ICICIBANK.NS","INFY":"INFY.NS","TCS":"TCS.NS","SBIN":"SBIN.NS"}
     instrument = st.selectbox("Instrument", list(chart_symbols))
     period = st.selectbox("Period", ["1d","5d","1mo","3mo","6mo","1y","2y"], index=2)
@@ -110,7 +177,7 @@ with tabs[0]:
             fig.add_trace(go.Candlestick(x=d.index, open=d.Open, high=d.High, low=d.Low, close=d.Close, name="Price"))
             fig.add_trace(go.Scatter(x=d.index, y=d.SMA20, name="SMA 20"))
             fig.add_trace(go.Scatter(x=d.index, y=d.SMA50, name="SMA 50"))
-            fig.update_layout(height=480, xaxis_rangeslider_visible=False)
+            fig.update_layout(height=480, xaxis_rangeslider_visible=False, template="plotly_dark", paper_bgcolor="#101827", plot_bgcolor="#101827", margin=dict(l=12,r=12,t=35,b=12), legend=dict(orientation="h", y=1.02))
             st.plotly_chart(fig, use_container_width=True)
             c1,c2 = st.columns(2)
             with c1: st.line_chart(rsi(d.Close).rename("RSI 14"))
@@ -121,6 +188,7 @@ with tabs[0]:
 
 with tabs[1]:
     st.subheader("Technical scanner")
+    st.markdown('<div class="section-note">Compare selected symbols using the existing SMA and RSI checks.</div>', unsafe_allow_html=True)
     raw = st.text_input("Yahoo symbols, comma-separated", "RELIANCE.NS,HDFCBANK.NS,ICICIBANK.NS,INFY.NS,TCS.NS,SBIN.NS,ITC.NS,LT.NS")
     if st.button("Run scanner"):
         rows = []
@@ -157,7 +225,7 @@ with tabs[2]:
         pnl = (intrinsic-premium)*qty-costs
         fig = go.Figure(go.Scatter(x=prices,y=pnl,mode="lines",name="Expiry P/L"))
         fig.add_hline(y=0,line_dash="dash")
-        fig.update_layout(height=350,xaxis_title="Underlying at expiry",yaxis_title="Estimated P/L (₹)")
+        fig.update_layout(height=350,xaxis_title="Underlying at expiry",yaxis_title="Estimated P/L (₹)",template="plotly_dark",paper_bgcolor="#101827",plot_bgcolor="#101827")
         st.plotly_chart(fig,use_container_width=True)
         st.write(f"Break-even: ₹{(strike+premium if option.startswith('CE') else strike-premium):,.2f}")
         st.write(f"Maximum long-option loss: ₹{premium*qty+costs:,.2f}")
@@ -171,7 +239,6 @@ def fetch_nse_fii_dii():
     session = requests.Session()
     session.headers.update({"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
         "Accept":"application/json, text/plain, */*","Referer":"https://www.nseindia.com/reports/fii-dii"})
-    # Keep NSE requests short so a blocked endpoint cannot stall the whole dashboard.
     session.get("https://www.nseindia.com/", timeout=4)
     response = session.get("https://www.nseindia.com/api/fiidiiTradeReact", timeout=6)
     response.raise_for_status()
@@ -267,6 +334,7 @@ with tabs[3]:
 
 with tabs[4]:
     st.subheader("Position sizing and risk")
+    st.markdown('<div class="section-note">Estimate position size from capital, stop distance and chosen risk.</div>', unsafe_allow_html=True)
     a,b = st.columns(2)
     with a:
         capital = st.number_input("Trading capital (₹)", min_value=0.0, value=100000.0, step=5000.0)
