@@ -380,7 +380,7 @@ with refresh_col:
 with status_col:
     st.caption(f"Last page refresh: {datetime.now(ZoneInfo('Asia/Kolkata')):%I:%M:%S %p IST} · Automatic refresh interval: 30 seconds")
 
-tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "🧮 Options payoff", "🏦 FII / DII", "🛡️ Risk calculator", "📝 Paper journal", "🔗 Resources", "⭐ Watchlists"])
+tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "🧮 Options payoff", "🏦 FII / DII", "🛡️ Risk calculator", "📝 Paper journal", "🔗 Resources", "⭐ Watchlists", "🗺️ Market Heatmap", "💼 Portfolio"])
 
 with tabs[0]:
     st.subheader("Price charts")
@@ -871,6 +871,115 @@ with tabs[7]:
                 st.rerun()
         else:
             st.caption("Keep at least one watchlist. You can remove all its symbols instead.")
+
+# ---------- Market heatmap: free Yahoo Finance quotes ----------
+with tabs[8]:
+    st.subheader("Market heatmap")
+    st.caption("Equal-sized tiles coloured by latest percentage move. Yahoo Finance quotes may be delayed.")
+    groups = {
+        "Banking": ["HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS", "AXISBANK.NS", "KOTAKBANK.NS"],
+        "IT": ["TCS.NS", "INFY.NS", "WIPRO.NS", "HCLTECH.NS", "TECHM.NS"],
+        "Energy": ["RELIANCE.NS", "ONGC.NS", "NTPC.NS", "POWERGRID.NS"],
+        "Auto": ["MARUTI.NS", "TATAMOTORS.NS", "M&M.NS", "BAJAJ-AUTO.NS"],
+        "FMCG": ["ITC.NS", "HINDUNILVR.NS", "TATACONSUM.NS", "NESTLEIND.NS"],
+        "Pharma": ["SUNPHARMA.NS", "DRREDDY.NS", "CIPLA.NS", "DIVISLAB.NS"],
+    }
+    heat_symbols = [s for values in groups.values() for s in values]
+    if st.button("Load / refresh market heatmap", key="load_market_heatmap"):
+        with st.spinner("Loading market moves..."):
+            st.session_state["heatmap_quotes"] = get_watchlist_quotes(tuple(heat_symbols))
+    if "heatmap_quotes" in st.session_state:
+        qmap = st.session_state["heatmap_quotes"]
+        rows = []
+        for sector, names in groups.items():
+            for symbol in names:
+                q = qmap.get(symbol)
+                if q and q[2] is not None:
+                    rows.append({"Sector": sector, "Symbol": symbol.replace(".NS", ""), "Change %": float(q[2]), "Price": float(q[0])})
+        if rows:
+            heat = pd.DataFrame(rows)
+            fig_heat = go.Figure(go.Treemap(
+                labels=heat["Symbol"], parents=heat["Sector"],
+                ids=heat["Sector"] + "/" + heat["Symbol"], values=np.ones(len(heat)),
+                marker=dict(colors=heat["Change %"], colorscale=[[0, "#b91c1c"], [0.5, "#263650"], [1, "#047857"]], cmid=0, colorbar=dict(title="Change %")),
+                customdata=heat[["Change %", "Price"]].to_numpy(),
+                hovertemplate="<b>%{label}</b><br>Change: %{customdata[0]:+.2f}%<br>Price: %{customdata[1]:,.2f}<extra></extra>"
+            ))
+            fig_heat.update_layout(height=500, template="plotly_dark", paper_bgcolor="#101827", plot_bgcolor="#101827", margin=dict(l=8,r=8,t=20,b=8))
+            st.plotly_chart(fig_heat, use_container_width=True)
+            st.dataframe(heat.sort_values("Change %", ascending=False), use_container_width=True, hide_index=True)
+            st.caption("Tile sizes are equal; colour represents percentage change. Only symbols with available quotes are shown.")
+        else:
+            st.warning("No usable quotes returned. Try refreshing later.")
+    else:
+        st.info("Load the heatmap when needed. Data is fetched on demand to keep startup fast.")
+
+
+# ---------- Portfolio analytics: session holdings and CSV backup ----------
+with tabs[9]:
+    st.subheader("Portfolio analytics")
+    st.caption("Manually entered holdings valued using available Yahoo Finance quotes. Not connected to a broker.")
+    columns = ["Symbol", "Quantity", "Average Cost"]
+    if "portfolio_holdings" not in st.session_state:
+        st.session_state["portfolio_holdings"] = []
+    with st.form("portfolio_add_holding", clear_on_submit=True):
+        a, b, d = st.columns([2, 1, 1])
+        symbol = a.text_input("Yahoo Finance symbol", placeholder="RELIANCE.NS or AAPL")
+        quantity = b.number_input("Quantity", min_value=0.0001, value=1.0, step=1.0)
+        avg_cost = d.number_input("Average buy price", min_value=0.01, value=100.0, step=1.0)
+        submitted = st.form_submit_button("Add holding")
+        if submitted:
+            ticker = symbol.strip().upper()
+            valid = bool(ticker) and len(ticker) <= 24 and all(ch.isalnum() or ch in ".-^=" for ch in ticker)
+            if not valid:
+                st.warning("Enter a valid symbol such as RELIANCE.NS or AAPL.")
+            else:
+                holdings = st.session_state["portfolio_holdings"]
+                old = next((x for x in holdings if x["Symbol"] == ticker), None)
+                if old:
+                    total_qty = float(old["Quantity"]) + float(quantity)
+                    old["Average Cost"] = (float(old["Quantity"]) * float(old["Average Cost"]) + float(quantity) * float(avg_cost)) / total_qty
+                    old["Quantity"] = total_qty
+                else:
+                    holdings.append({"Symbol": ticker, "Quantity": float(quantity), "Average Cost": float(avg_cost)})
+                st.session_state["portfolio_holdings"] = holdings
+                st.rerun()
+    holdings = st.session_state["portfolio_holdings"]
+    if holdings:
+        quote_map = get_watchlist_quotes(tuple(x["Symbol"] for x in holdings))
+        rows = []
+        for holding in holdings:
+            quote = quote_map.get(holding["Symbol"])
+            price = float(quote[0]) if quote else np.nan
+            invested = float(holding["Quantity"]) * float(holding["Average Cost"])
+            value = float(holding["Quantity"]) * price if pd.notna(price) else np.nan
+            pnl = value - invested if pd.notna(value) else np.nan
+            rows.append({"Symbol": holding["Symbol"], "Quantity": holding["Quantity"], "Average Cost": holding["Average Cost"],
+                         "Latest Price": price, "Invested": invested, "Market Value": value, "Unrealized P/L": pnl,
+                         "Return %": pnl / invested * 100 if pd.notna(pnl) and invested else np.nan})
+        pf = pd.DataFrame(rows)
+        invested_total = pf["Invested"].sum()
+        value_total = pf["Market Value"].sum(min_count=1)
+        pnl_total = value_total - invested_total if pd.notna(value_total) else np.nan
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Invested", f"₹{invested_total:,.2f}")
+        m2.metric("Quoted value", f"₹{value_total:,.2f}" if pd.notna(value_total) else "Unavailable")
+        m3.metric("Unrealized P/L", f"₹{pnl_total:+,.2f}" if pd.notna(pnl_total) else "Unavailable")
+        m4.metric("Return", f"{pnl_total / invested_total * 100:+.2f}%" if pd.notna(pnl_total) and invested_total else "Unavailable")
+        st.dataframe(pf, use_container_width=True, hide_index=True)
+        alloc = pf.dropna(subset=["Market Value"])
+        if not alloc.empty and alloc["Market Value"].sum() > 0:
+            fig_alloc = go.Figure(go.Pie(labels=alloc["Symbol"], values=alloc["Market Value"], hole=0.62))
+            fig_alloc.update_layout(title="Portfolio allocation", height=350, template="plotly_dark", paper_bgcolor="#101827", plot_bgcolor="#101827")
+            st.plotly_chart(fig_alloc, use_container_width=True)
+        remove = st.selectbox("Remove holding", ["Select"] + [x["Symbol"] for x in holdings], key="portfolio_remove")
+        if st.button("Remove selected holding", key="portfolio_remove_btn", disabled=remove == "Select"):
+            st.session_state["portfolio_holdings"] = [x for x in holdings if x["Symbol"] != remove]
+            st.rerun()
+        st.download_button("Download portfolio CSV backup", pd.DataFrame(holdings, columns=columns).to_csv(index=False), "rakesh_portfolio_backup.csv", "text/csv")
+    else:
+        st.info("Your portfolio is empty. Add a holding above to begin tracking.")
+    st.caption("Holdings are stored in this Streamlit session and may reset after a restart. Download a CSV backup regularly. Quotes may be delayed or unavailable.")
 
 st.divider()
 st.caption("Rakesh Market Analysis · Educational research and paper trading only · Not investment advice")
