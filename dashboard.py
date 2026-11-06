@@ -235,7 +235,7 @@ with tabs[1]:
                     trend = "Bearish trend"
                 else:
                     trend = "Mixed / neutral"
-                rows.append({"Symbol":symbol,"Price":f"{currency}{last_close:,.2f}","SMA20":round(float(s20),2),"SMA50":round(float(s50),2) if pd.notna(s50) else None,"RSI14":round(float(rsi(c).iloc[-1]),1),"Trend":trend})
+                rows.append({"Symbol":symbol,"Price":f"{currency}{last_close:,.2f}","SMA20":f"{currency}{float(s20):,.2f}","SMA50":f"{currency}{float(s50):,.2f}" if pd.notna(s50) else "—","RSI14":round(float(rsi(c).iloc[-1]),1),"Trend":trend})
         if rows:
             result = pd.DataFrame(rows)
             st.dataframe(result, use_container_width=True, hide_index=True)
