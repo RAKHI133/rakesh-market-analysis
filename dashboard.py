@@ -164,7 +164,8 @@ with tabs[0]:
     instrument = st.selectbox("Instrument", list(chart_symbols))
     chart_symbol = chart_symbols[instrument]
     chart_currency = "$" if chart_symbol in {"AAPL","MSFT","NVDA","AMZN","TSLA","GOOGL","META"} else ("₹" if chart_symbol.endswith((".NS", ".BO")) else "")
-    st.caption(f"Selected instrument: {instrument} · Display currency: {'USD ($)' if chart_currency == '
+    currency_label = "USD ($)" if chart_currency == "$" else ("INR (₹)" if chart_currency == "₹" else "index points")
+    st.caption(f"Selected instrument: {instrument} · Display currency: {currency_label}")
     period = st.selectbox("Period", ["1d","5d","1mo","3mo","6mo","1y","2y"], index=2)
     interval = st.selectbox("Interval", ["1m","5m","15m","1d"], index=3)
     if period not in ["1d","5d"]:
