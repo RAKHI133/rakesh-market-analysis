@@ -100,49 +100,49 @@ st.markdown(f"""
   [data-testid="stToggle"] label, [data-testid="stSelectbox"] label,
   [data-testid="stMultiSelect"] label, [data-testid="stTextInput"] label,
   [data-testid="stNumberInput"] label, [data-testid="stDateInput"] label,
-  [data-testid="stTimeInput"] label, [data-testid="stTextArea"] label {
-    color: ${text_color} !important;
-  }
+  [data-testid="stTimeInput"] label, [data-testid="stTextArea"] label {{
+    color: {text_color} !important;
+  }}
   [data-testid="stTextInput"] input, [data-testid="stNumberInput"] input,
   [data-testid="stDateInput"] input, [data-testid="stTimeInput"] input,
-  [data-testid="stTextArea"] textarea {
-    color: ${text_color} !important;
-    -webkit-text-fill-color: ${text_color} !important;
-    caret-color: ${accent_color} !important;
+  [data-testid="stTextArea"] textarea {{
+    color: {text_color} !important;
+    -webkit-text-fill-color: {text_color} !important;
+    caret-color: {accent_color} !important;
     opacity: 1 !important;
-  }
-  input::placeholder, textarea::placeholder {
-    color: ${muted_color} !important; opacity: 1 !important;
-  }
-  [data-testid="stDataFrame"], [data-testid="stTable"] {
-    background: ${surface_bg} !important;
-    border: 1px solid ${border_color} !important;
+  }}
+  input::placeholder, textarea::placeholder {{
+    color: {muted_color} !important; opacity: 1 !important;
+  }}
+  [data-testid="stDataFrame"], [data-testid="stTable"] {{
+    background: {surface_bg} !important;
+    border: 1px solid {border_color} !important;
     border-radius: 12px !important;
-  }
-  [data-testid="stDataFrame"] iframe { color-scheme: ${"light" if is_day_theme else "dark"} !important; }
+  }}
+  [data-testid="stDataFrame"] iframe {{ color-scheme: {"light" if is_day_theme else "dark"} !important; }}
   [data-testid="stButton"] button, [data-testid="stDownloadButton"] button,
-  [data-testid="stFormSubmitButton"] button {
-    color: ${text_color} !important;
-    background: ${surface_bg} !important;
-    border: 1px solid ${border_color} !important;
-  }
+  [data-testid="stFormSubmitButton"] button {{
+    color: {text_color} !important;
+    background: {surface_bg} !important;
+    border: 1px solid {border_color} !important;
+  }}
   [data-testid="stButton"] button:hover, [data-testid="stDownloadButton"] button:hover,
-  [data-testid="stFormSubmitButton"] button:hover {
-    color: ${accent_color} !important; border-color: ${accent_color} !important;
-    background: ${hover_bg} !important;
-  }
-  [data-testid="stTabs"] button[role="tab"] p { color: ${muted_color} !important; }
-  [data-testid="stTabs"] button[aria-selected="true"] p { color: ${accent_color} !important; }
-  [data-testid="stAlert"] p, [data-testid="stAlert"] li { color: ${text_color} !important; }
-  [data-testid="stExpander"] summary, [data-testid="stExpander"] summary p {
-    color: ${text_color} !important;
-  }
+  [data-testid="stFormSubmitButton"] button:hover {{
+    color: {accent_color} !important; border-color: {accent_color} !important;
+    background: {hover_bg} !important;
+  }}
+  [data-testid="stTabs"] button[role="tab"] p {{ color: {muted_color} !important; }}
+  [data-testid="stTabs"] button[aria-selected="true"] p {{ color: {accent_color} !important; }}
+  [data-testid="stAlert"] p, [data-testid="stAlert"] li {{ color: {text_color} !important; }}
+  [data-testid="stExpander"] summary, [data-testid="stExpander"] summary p {{
+    color: {text_color} !important;
+  }}
   [data-testid="stMetricValue"], [data-testid="stMetricLabel"],
-  [data-testid="stMetricDelta"] { opacity: 1 !important; }
+  [data-testid="stMetricDelta"] {{ opacity: 1 !important; }}
   .stSelectbox [data-baseweb="select"] *, [data-baseweb="popover"] *,
-  [data-baseweb="menu"] *, [role="listbox"] * {
-    color: ${text_color} !important;
-  }
+  [data-baseweb="menu"] *, [role="listbox"] * {{
+    color: {text_color} !important;
+  }}
 </style>
 """, unsafe_allow_html=True)
 
