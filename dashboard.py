@@ -487,13 +487,13 @@ with tabs[3]:
             st.caption(f"NSE error: {error}")
             st.info("Open the official NSE report link above to check the latest published figures. No values are fabricated.")
         else:
-            sessions = st.selectbox("History to display", [5, 10, 20], index=0, format_func=lambda x: f"Last {x} trading sessions")
-            history = data.head(sessions).copy().sort_values("date_sort")
+            # Display every daily record NSE returns; no weekly roll-up or date truncation.
+            history = data.copy().sort_values("date_sort")
             latest = data.iloc[0]
             a,b = st.columns(2)
             a.metric("Latest FII/FPI net (₹ crore)", f"{latest.fii_net:,.2f}")
             b.metric("Latest DII net (₹ crore)", f"{latest.dii_net:,.2f}")
-            st.caption(f"Source: NSE · Latest available date: {latest.date_sort:%d %b %Y} · {len(history)} trading sessions displayed")
+            st.caption(f"Source: NSE · Latest available date: {latest.date_sort:%d %b %Y} · Showing all {len(history)} daily records returned by NSE")
             totals = history[["fii_buy","fii_sell","fii_net","dii_buy","dii_sell","dii_net"]].sum()
             c1,c2,c3 = st.columns(3)
             c1.metric(f"FII net · {len(history)} sessions", f"₹{totals.fii_net:,.2f} Cr")
@@ -507,67 +507,7 @@ with tabs[3]:
             })
             st.dataframe(table.sort_values("Date", ascending=False), use_container_width=True, hide_index=True)
             st.download_button("Download FII/DII CSV", table.to_csv(index=False), "fii_dii_history.csv", "text/csv")
-            if len(history) < sessions:
-                st.info(f"NSE returned {len(history)} daily records. No missing sessions are invented.")
-
-            # Weekly aggregation from the actual daily NSE records returned above.
-            st.divider()
-            st.subheader("Weekly FII / DII flow")
-            st.caption("Weekly totals are calculated by adding the available daily NSE cash-market figures. The current week is shown as week-to-date when it is incomplete.")
-            weekly_source = data.copy()
-            weekly_source["week_start"] = weekly_source["date_sort"].dt.to_period("W-FRI").dt.start_time
-            weekly = (
-                weekly_source.groupby("week_start", as_index=False)
-                .agg({
-                    "fii_buy":"sum", "fii_sell":"sum", "fii_net":"sum",
-                    "dii_buy":"sum", "dii_sell":"sum", "dii_net":"sum",
-                    "date_sort":"count"
-                })
-                               .rename(columns={"date_sort":"Trading sessions"})
-                .sort_values("week_start", ascending=False)
-            )
-            week_count = st.selectbox(
-                "Weeks to display",
-                [1, 4, 8, 12],
-                index=1,
-                format_func=lambda value: f"Last {value} week(s)"
-            )
-            weekly_view = weekly.head(week_count).copy().sort_values("week_start")
-            current_week = pd.Timestamp.now(tz="Asia/Kolkata").tz_localize(None).to_period("W-FRI")
-            weekly_view["Week"] = weekly_view["week_start"].apply(
-                lambda start: (
-                    f"{start:%d %b} – {(start + pd.Timedelta(days=6)):%d %b %Y}"
-                    + (" · week to date" if start.to_period("W-FRI") == current_week else "")
-                )
-            )
-            weekly_totals = weekly_view[["fii_net", "dii_net"]].sum()
-            w1, w2, w3 = st.columns(3)
-            w1.metric(f"FII net · {len(weekly_view)} week(s)", f"₹{weekly_totals.fii_net:,.2f} Cr")
-            w2.metric(f"DII net · {len(weekly_view)} week(s)", f"₹{weekly_totals.dii_net:,.2f} Cr")
-            w3.metric("Combined weekly net", f"₹{weekly_totals.fii_net + weekly_totals.dii_net:,.2f} Cr")
-
-            weekly_chart = weekly_view.set_index("Week")[["fii_net", "dii_net"]].rename(
-                columns={"fii_net":"FII/FPI net", "dii_net":"DII net"}
-            )
-            st.bar_chart(weekly_chart, use_container_width=True)
-
-            weekly_table = weekly_view[[
-                "Week", "Trading sessions", "fii_buy", "fii_sell", "fii_net",
-                "dii_buy", "dii_sell", "dii_net"
-            ]].rename(columns={
-                "fii_buy":"FII Buy (₹ Cr)", "fii_sell":"FII Sell (₹ Cr)", "fii_net":"FII Net (₹ Cr)",
-                "dii_buy":"DII Buy (₹ Cr)", "dii_sell":"DII Sell (₹ Cr)", "dii_net":"DII Net (₹ Cr)"
-            })
-            st.dataframe(weekly_table.sort_values("Week", ascending=False), use_container_width=True, hide_index=True)
-            st.download_button(
-                "Download weekly FII/DII CSV",
-                weekly_table.to_csv(index=False),
-                "weekly_fii_dii_summary.csv",
-                "text/csv",
-                key="download_weekly_fii_dii"
-            )
-            if len(weekly) < week_count:
-                st.info(f"NSE returned {len(weekly)} week(s) of daily records. Older weekly data is not fabricated.")
+            st.caption("Each row represents one trading day. Values are in ₹ crore; non-trading days are not included. The table contains all daily records currently returned by the NSE source.")
 
 with tabs[4]:
     st.subheader("Position sizing and risk")
