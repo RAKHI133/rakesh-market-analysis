@@ -425,41 +425,63 @@ def fetch_nse_fii_dii():
         payload = payload.get("data", payload.get("records", []))
     if not isinstance(payload, list) or not payload:
         raise ValueError("NSE returned no FII/DII records.")
+
     rows = {}
+    def number(value):
+        try:
+            return float(str(value).replace(",", "").replace("₹", "").strip())
+        except (TypeError, ValueError):
+            return None
+
     for item in payload:
         if not isinstance(item, dict):
             continue
         normalized = {re.sub(r"[^a-z0-9]", "", str(k).lower()): v for k, v in item.items()}
-        date_value = next((normalized[k] for k in ("date","tradingdate","tradedate") if normalized.get(k)), None)
+        date_value = next((normalized[k] for k in ("date", "tradingdate", "tradedate") if normalized.get(k)), None)
         if not date_value:
             continue
         dt = pd.to_datetime(date_value, errors="coerce", dayfirst=True)
         if pd.isna(dt):
             continue
-        category = str(normalized.get("category", normalized.get("investor", normalized.get("clienttype", "")))).lower()
-        buy = next((normalized[k] for k in ("buyvalue","grossbuy","buy","purchasevalue") if k in normalized), None)
-        sell = next((normalized[k] for k in ("sellvalue","grosssell","sell","salevalue") if k in normalized), None)
-        net = next((normalized[k] for k in ("netvalue","net","netpurchase") if k in normalized), None)
-        if buy is None or sell is None or net is None:
-            continue
-        try:
-            values = [float(str(v).replace(",","")) for v in (buy, sell, net)]
-        except (TypeError, ValueError):
-            continue
         key = dt.strftime("%Y-%m-%d")
-        row = rows.setdefault(key, {"date":dt.strftime("%d-%b-%Y"),"date_sort":dt})
+
+        # NSE's combined response contains FII and DII fields in each daily record.
+        combined_aliases = {
+            "fii_buy": ("fiibuy", "fiibuyvalue", "fiigrossbuy"),
+            "fii_sell": ("fiisell", "fiisellvalue", "fiigrosssell"),
+            "fii_net": ("fiinet", "fiinetvalue"),
+            "dii_buy": ("diibuy", "diibuyvalue", "diigrossbuy"),
+            "dii_sell": ("diisell", "diisellvalue", "diigrosssell"),
+            "dii_net": ("diinet", "diinetvalue"),
+        }
+        combined = {
+            target: number(next((normalized[name] for name in aliases if normalized.get(name) is not None), None))
+            for target, aliases in combined_aliases.items()
+        }
+        if all(value is not None for value in combined.values()):
+            rows[key] = {"date": dt.strftime("%d-%b-%Y"), "date_sort": dt, **combined}
+            continue
+
+        # Backward-compatible parsing for NSE responses split into FII and DII category rows.
+        category = str(normalized.get("category", normalized.get("investor", normalized.get("clienttype", "")))).lower()
+        buy = next((normalized[k] for k in ("buyvalue", "grossbuy", "buy", "purchasevalue") if k in normalized), None)
+        sell = next((normalized[k] for k in ("sellvalue", "grosssell", "sell", "salevalue") if k in normalized), None)
+        net = next((normalized[k] for k in ("netvalue", "net", "netpurchase") if k in normalized), None)
+        values = [number(v) for v in (buy, sell, net)]
+        if any(value is None for value in values):
+            continue
+        row = rows.setdefault(key, {"date": dt.strftime("%d-%b-%Y"), "date_sort": dt})
         if "fii" in category or "fpi" in category:
-            row.update({"fii_buy":values[0],"fii_sell":values[1],"fii_net":values[2]})
+            row.update({"fii_buy": values[0], "fii_sell": values[1], "fii_net": values[2]})
         elif "dii" in category:
-            row.update({"dii_buy":values[0],"dii_sell":values[1],"dii_net":values[2]})
-    records = []
-    for row in rows.values():
-        if all(k in row for k in ("fii_buy","fii_sell","fii_net","dii_buy","dii_sell","dii_net")):
-            records.append(row)
+            row.update({"dii_buy": values[0], "dii_sell": values[1], "dii_net": values[2]})
+
+    required = ("fii_buy", "fii_sell", "fii_net", "dii_buy", "dii_sell", "dii_net")
+    records = [row for row in rows.values() if all(row.get(field) is not None for field in required)]
     df = pd.DataFrame(records)
     if df.empty:
-        raise ValueError("NSE response format did not contain matching FII and DII rows.")
-    return df.sort_values("date_sort", ascending=False).drop_duplicates("date_sort")
+        raise ValueError("NSE response did not contain complete daily FII and DII records.")
+    return df.sort_values("date_sort", ascending=False).drop_duplicates("date_sort").reset_index(drop=True)
 
 @st.cache_data(ttl=900, show_spinner=False)
 def fetch_fii_dii():
@@ -487,13 +509,13 @@ with tabs[3]:
             st.caption(f"NSE error: {error}")
             st.info("Open the official NSE report link above to check the latest published figures. No values are fabricated.")
         else:
-            # Display every daily record NSE returns; no weekly roll-up or date truncation.
-            history = data.copy().sort_values("date_sort")
+            # Show the latest five trading sessions (one trading week), one row per day.
+            history = data.head(5).copy().sort_values("date_sort")
             latest = data.iloc[0]
             a,b = st.columns(2)
             a.metric("Latest FII/FPI net (₹ crore)", f"{latest.fii_net:,.2f}")
             b.metric("Latest DII net (₹ crore)", f"{latest.dii_net:,.2f}")
-            st.caption(f"Source: NSE · Latest available date: {latest.date_sort:%d %b %Y} · Showing all {len(history)} daily records returned by NSE")
+            st.caption(f"Source: NSE · Latest available date: {latest.date_sort:%d %b %Y} · Showing the latest {len(history)} trading sessions (one week)")
             totals = history[["fii_buy","fii_sell","fii_net","dii_buy","dii_sell","dii_net"]].sum()
             c1,c2,c3 = st.columns(3)
             c1.metric(f"FII net · {len(history)} sessions", f"₹{totals.fii_net:,.2f} Cr")
@@ -507,7 +529,7 @@ with tabs[3]:
             })
             st.dataframe(table.sort_values("Date", ascending=False), use_container_width=True, hide_index=True)
             st.download_button("Download FII/DII CSV", table.to_csv(index=False), "fii_dii_history.csv", "text/csv")
-            st.caption("Each row represents one trading day. Values are in ₹ crore; non-trading days are not included. The table contains all daily records currently returned by the NSE source.")
+            st.caption("Each row represents one trading day. Values are in ₹ crore; weekends and market holidays are excluded. Showing the latest five available trading sessions.")
 
 with tabs[4]:
     st.subheader("Position sizing and risk")
