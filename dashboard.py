@@ -34,39 +34,53 @@ if maintenance_mode:
 
 st_autorefresh(interval=30_000, key="market_refresh")
 
+# ---------- Theme switch: compact control at the top-right ----------
+theme_spacer, theme_control = st.columns([8, 2])
+with theme_control:
+    is_day_theme = st.toggle("☀️ Day  /  🌙 Night", value=False, key="dashboard_theme")
+PLOTLY_TEMPLATE = "plotly_white" if is_day_theme else "plotly_dark"
+PLOT_BG = "#ffffff" if is_day_theme else "#101827"
+
 # ---------- Visual system: compact, clear, and responsive ----------
-st.markdown("""
+if is_day_theme:
+    app_bg, sidebar_bg = "#f3f6fb", "#e9eef6"
+    border_color, text_color, muted_color = "#d7dfeb", "#172338", "#5b6b82"
+    hero_bg = "linear-gradient(115deg,#e2edff 0%,#f5f8ff 58%,#e2f5f1 100%)"
+    hero_border, hero_title, hero_sub, accent_color = "#c5d5ec", "#14243b", "#52657e", "#1769aa"
+    metric_bg = "linear-gradient(145deg,#ffffff,#f4f7fc)"
+else:
+    app_bg, sidebar_bg = "#0b1020", "#10182b"
+    border_color, text_color, muted_color = "#263650", "#d9e6f5", "#91a3bb"
+    hero_bg = "linear-gradient(115deg,#152744 0%,#101b30 58%,#102a35 100%)"
+    hero_border, hero_title, hero_sub, accent_color = "#2a4261", "#f2f6fc", "#b5c5d9", "#7dd3fc"
+    metric_bg = "linear-gradient(145deg,#151f34,#111a2b)"
+
+st.markdown(f"""
 <style>
-  :root { color-scheme: dark; }
-  .block-container { max-width: 1480px; padding-top: 1.35rem; padding-bottom: 2.5rem; }
-  [data-testid="stAppViewContainer"] { background: #0b1020; }
-  [data-testid="stHeader"] { background: rgba(11,16,32,.88); }
-  [data-testid="stSidebar"] { background: #10182b; border-right: 1px solid #24314a; }
-  h1, h2, h3 { letter-spacing: -.025em; }
-  h1 { font-size: clamp(1.7rem, 3vw, 2.35rem) !important; }
-  [data-testid="stMetric"] {
-    background: linear-gradient(145deg,#151f34,#111a2b);
-    border: 1px solid #263650; border-radius: 14px;
-    padding: 14px 16px; min-height: 112px;
-  }
-  [data-testid="stMetricLabel"] { color: #a8b7ce !important; font-size: .86rem; }
-  [data-testid="stMetricValue"] { font-size: clamp(1.2rem,2vw,1.8rem); }
-  [data-testid="stMetricDelta"] { font-size: .82rem; }
-  div[data-testid="stTabs"] button[role="tab"] { padding: .7rem .9rem; }
-  div[data-testid="stTabs"] button[aria-selected="true"] { color: #7dd3fc; }
-  .hero {
-    background: linear-gradient(115deg,#152744 0%,#101b30 58%,#102a35 100%);
-    border: 1px solid #2a4261; border-radius: 18px;
-    padding: 1.15rem 1.35rem; margin: .25rem 0 1.1rem;
-  }
-  .hero-kicker { color:#8fb8df; text-transform:uppercase; letter-spacing:.13em; font-size:.72rem; font-weight:700; }
-  .hero-title { color:#f2f6fc; font-size:1.55rem; font-weight:750; margin:.2rem 0; }
-  .hero-sub { color:#b5c5d9; font-size:.9rem; }
-  .section-note { color:#91a3bb; font-size:.82rem; margin-top:-.45rem; }
-  .market-heading { color:#d9e6f5; font-size:1rem; font-weight:700; margin:.85rem 0 .45rem; }
-  .stButton button, .stDownloadButton button { border-radius:10px; }
-  [data-testid="stDataFrame"] { border:1px solid #263650; border-radius:12px; overflow:hidden; }
-  hr { border-color:#263650; }
+  :root {{ color-scheme: {"light" if is_day_theme else "dark"}; }}
+  .block-container {{ max-width: 1480px; padding-top: 1.1rem; padding-bottom: 2.5rem; }}
+  [data-testid="stAppViewContainer"] {{ background: {app_bg}; }}
+  [data-testid="stHeader"] {{ background: {app_bg}; }}
+  [data-testid="stSidebar"] {{ background: {sidebar_bg}; border-right: 1px solid {border_color}; }}
+  [data-testid="stAppViewContainer"], [data-testid="stMain"] {{ color: {text_color}; }}
+  h1, h2, h3, p, label {{ color: {text_color}; letter-spacing: -.015em; }}
+  h1 {{ font-size: clamp(1.7rem, 3vw, 2.35rem) !important; }}
+  [data-testid="stMetric"] {{ background: {metric_bg}; border: 1px solid {border_color}; border-radius: 14px; padding: 14px 16px; min-height: 112px; }}
+  [data-testid="stMetricLabel"] {{ color: {muted_color} !important; font-size: .86rem; }}
+  [data-testid="stMetricValue"] {{ color: {text_color}; font-size: clamp(1.2rem,2vw,1.8rem); }}
+  [data-testid="stMetricDelta"] {{ font-size: .82rem; }}
+  div[data-testid="stTabs"] button[role="tab"] {{ padding: .7rem .9rem; color: {muted_color}; }}
+  div[data-testid="stTabs"] button[aria-selected="true"] {{ color: {accent_color}; }}
+  .hero {{ background: {hero_bg}; border: 1px solid {hero_border}; border-radius: 18px; padding: 1.15rem 1.35rem; margin: .15rem 0 1.1rem; }}
+  .hero-kicker {{ color:{accent_color}; text-transform:uppercase; letter-spacing:.13em; font-size:.72rem; font-weight:700; }}
+  .hero-title {{ color:{hero_title}; font-size:1.55rem; font-weight:750; margin:.2rem 0; }}
+  .hero-sub {{ color:{hero_sub}; font-size:.9rem; }}
+  .section-note {{ color:{muted_color}; font-size:.82rem; margin-top:-.45rem; }}
+  .market-heading {{ color:{text_color}; font-size:1rem; font-weight:700; margin:.85rem 0 .45rem; }}
+  .stButton button, .stDownloadButton button {{ border-radius:10px; }}
+  [data-testid="stDataFrame"] {{ border:1px solid {border_color}; border-radius:12px; overflow:hidden; }}
+  hr {{ border-color:{border_color}; }}
+  [data-testid="stToggle"] {{ justify-content:flex-end; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -420,7 +434,7 @@ with tabs[0]:
             fig.add_trace(go.Candlestick(x=d.index, open=d.Open, high=d.High, low=d.Low, close=d.Close, name="Price"))
             fig.add_trace(go.Scatter(x=d.index, y=d.SMA20, name="SMA 20"))
             fig.add_trace(go.Scatter(x=d.index, y=d.SMA50, name="SMA 50"))
-            fig.update_layout(height=480, xaxis_rangeslider_visible=False, template="plotly_dark", paper_bgcolor="#101827", plot_bgcolor="#101827", yaxis_tickprefix=chart_currency, margin=dict(l=12,r=12,t=35,b=12), legend=dict(orientation="h", y=1.02))
+            fig.update_layout(height=480, xaxis_rangeslider_visible=False, template=PLOTLY_TEMPLATE, paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG, yaxis_tickprefix=chart_currency, margin=dict(l=12,r=12,t=35,b=12), legend=dict(orientation="h", y=1.02))
             st.plotly_chart(fig, use_container_width=True)
             c1,c2 = st.columns(2)
             with c1: st.line_chart(rsi(d.Close).rename("RSI 14"))
