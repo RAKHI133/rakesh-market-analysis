@@ -952,8 +952,8 @@ with tabs[7]:
         else:
             st.caption("Keep at least one watchlist. You can remove all its symbols instead.")
 
-# ---------- Market he analytics: session holdings and CSV backup ----------
-with tabs[9]:
+# ---------- Portfolio analytics: session holdings and CSV backup ----------
+with tabs[8]:
     st.subheader("Portfolio analytics")
     st.caption("Manually entered holdings valued using available Yahoo Finance quotes. Not connected to a broker.")
     columns = ["Symbol", "Quantity", "Average Cost"]
