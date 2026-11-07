@@ -145,13 +145,13 @@ def get_history(symbol, period="6mo", interval="1d"):
 symbols = {
     "NIFTY 50":"^NSEI", "NIFTY BANK":"^NSEBANK", "SENSEX":"^BSESN",
     "INDIA VIX":"^INDIAVIX", "S&P 500":"^GSPC", "NASDAQ":"^IXIC", "DOW JONES":"^DJI",
-    "Gold Futures (COMEX)":"GC=F", "Silver Futures (COMEX)":"SI=F", "USD/INR":"INR=X"
+    "Gold (India equivalent)":"GC=F", "Silver (India equivalent)":"SI=F", "USD/INR":"INR=X"
 }
 # Values are displayed in their native market convention. Index values are points, not currency.
 QUOTE_FORMAT = {
     "NIFTY 50": ("", "pts"), "NIFTY BANK": ("", "pts"), "SENSEX": ("", "pts"),
     "INDIA VIX": ("", ""), "S&P 500": ("", "pts"), "NASDAQ": ("", "pts"), "DOW JONES": ("", "pts"),
-    "Gold Futures (COMEX)": ("$", "/troy oz"), "Silver Futures (COMEX)": ("$", "/troy oz"),
+    "Gold (India equivalent)": ("₹", "/gram"), "Silver (India equivalent)": ("₹", "/gram"),
     "USD/INR": ("₹", "per USD"),
 }
 
@@ -184,6 +184,17 @@ def get_market_quotes():
                     quotes[name] = None
             except Exception:
                 quotes[name] = None
+        # Convert COMEX USD/troy-ounce prices into indicative INR per gram.
+        # This is an India-currency equivalent, not a domestic MCX/retail bullion quote.
+        fx = quotes.get("USD/INR")
+        if fx and fx[0] > 0:
+            grams_per_troy_ounce = 31.1034768
+            for metal in ("Gold (India equivalent)", "Silver (India equivalent)"):
+                q = quotes.get(metal)
+                if q:
+                    latest_inr_g = q[0] * fx[0] / grams_per_troy_ounce
+                    change_inr_g = q[1] * fx[0] / grams_per_troy_ounce
+                    quotes[metal] = (latest_inr_g, change_inr_g, q[2])
         return quotes
     except Exception:
         return {name: None for name in symbols}
@@ -281,9 +292,9 @@ def render_market_group(title, names, columns=4):
 
 render_market_group("🇮🇳 Indian markets", ["NIFTY 50", "NIFTY BANK", "SENSEX", "INDIA VIX"])
 render_market_group("🇺🇸 US market indices", ["S&P 500", "NASDAQ", "DOW JONES"], columns=3)
-render_market_group("🥇 Precious metals", ["Gold Futures (COMEX)", "Silver Futures (COMEX)"], columns=2)
+render_market_group("🥇 Precious metals · India equivalent", ["Gold (India equivalent)", "Silver (India equivalent)"], columns=2)
 render_market_group("💱 Currency", ["USD/INR"], columns=1)
-st.caption("Gold and silver are COMEX futures quoted in USD per troy ounce. USD/INR is rupees per US dollar. Yahoo Finance quotes may be delayed, stale or unavailable; these are not MCX INR contract prices.")
+st.caption("Gold and silver are converted to indicative Indian rupees per gram from COMEX USD/troy-ounce futures using the USD/INR rate. These are not verified domestic spot/MCX prices and exclude Indian local premiums, import duty, GST and jeweller making charges. Yahoo Finance data may be delayed, stale or unavailable.")
 refresh_col, status_col = st.columns([1, 4])
 with refresh_col:
     if st.button("↻ Refresh data now", key="clear_market_data", use_container_width=True):
