@@ -283,36 +283,41 @@ def render_market_group(title, names, columns=4):
         q = quotes.get(name)
         prefix, suffix = QUOTE_FORMAT.get(name, ("", ""))
         with cols[i % columns]:
-            if q:
+            if name == "NIFTY 50":
+                if q:
+                    value = f"{prefix}{q[0]:,.2f}" + (f" {suffix}" if suffix else "")
+                    delta = f"{q[1]:+,.2f} ({q[2]:+.2f}%)"
+                    expander_label = f"📈 NIFTY 50  ·  {value}  ·  {delta}  ⌄"
+                else:
+                    expander_label = "📈 NIFTY 50  ·  Price unavailable  ⌄"
+
+                with st.expander(expander_label, expanded=False):
+                    st.caption("NIFTY 50 index details · Yahoo Finance data may be delayed.")
+                    nifty_history = get_history("^NSEI", period="5d", interval="5m")
+                    if not nifty_history.empty:
+                        latest_row = nifty_history.iloc[-1]
+                        previous_close = float(nifty_history["Close"].iloc[-2]) if len(nifty_history) > 1 else None
+                        m1, m2, m3 = st.columns(3)
+                        m1.metric("Last price", f"{float(latest_row['Close']):,.2f}")
+                        m2.metric("Open", f"{float(latest_row['Open']):,.2f}" if pd.notna(latest_row.get("Open")) else "—")
+                        m3.metric("Previous close", f"{previous_close:,.2f}" if previous_close is not None else "—")
+                        m4, m5, m6 = st.columns(3)
+                        m4.metric("Day high", f"{float(latest_row['High']):,.2f}" if pd.notna(latest_row.get("High")) else "—")
+                        m5.metric("Day low", f"{float(latest_row['Low']):,.2f}" if pd.notna(latest_row.get("Low")) else "—")
+                        volume = latest_row.get("Volume")
+                        m6.metric("Volume", f"{int(volume):,}" if pd.notna(volume) else "—")
+                        st.markdown("**Recent NIFTY 50 price movement**")
+                        st.line_chart(nifty_history["Close"].tail(60), height=220)
+                    else:
+                        st.warning("NIFTY 50 detailed prices are temporarily unavailable. Please try again after the next refresh.")
+                    st.caption("Source: Yahoo Finance (^NSEI). Indicative market data, not guaranteed exchange real-time data.")
+            elif q:
                 value = f"{prefix}{q[0]:,.2f}" + (f" {suffix}" if suffix else "")
                 delta = f"{q[1]:+,.2f} ({q[2]:+.2f}%)"
-                if name == "NIFTY 50":
-                    delta_color = "#16a34a" if q[1] >= 0 else "#dc2626"
-                    st.markdown(
-                        f'<a href="https://www.nseindia.com/static/products-services/indices-nifty50-index" target="_blank" rel="noopener noreferrer" '
-                        f'style="display:block;text-decoration:none;background:{metric_bg};border:1px solid {border_color};'
-                        f'border-radius:14px;padding:14px 16px;min-height:112px;">'
-                        f'<div style="font-size:.9rem;font-weight:600;color:{accent_color};">NIFTY 50 ↗</div>'
-                        f'<div style="font-size:1.65rem;font-weight:650;color:{text_color};margin-top:5px;">{value}</div>'
-                        f'<div style="font-size:.82rem;color:{delta_color};margin-top:4px;">{delta}</div>'
-                        f'</a>',
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    st.metric(name, value, delta)
+                st.metric(name, value, delta)
             else:
-                if name == "NIFTY 50":
-                    st.markdown(
-                        '<a href="https://www.nseindia.com/static/products-services/indices-nifty50-index" target="_blank" rel="noopener noreferrer" '
-                        f'style="display:block;text-decoration:none;background:{metric_bg};border:1px solid {border_color};'
-                        f'border-radius:14px;padding:14px 16px;min-height:112px;">'
-                        f'<div style="font-size:.9rem;font-weight:600;color:{accent_color};">NIFTY 50 ↗</div>'
-                        f'<div style="font-size:1.2rem;color:{muted_color};margin-top:12px;">Unavailable · Open index</div>'
-                        '</a>',
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    st.metric(name, "Unavailable")
+                st.metric(name, "Unavailable")
+
 
 render_market_group("🇮🇳 Indian markets", ["NIFTY 50", "NIFTY BANK", "SENSEX", "INDIA VIX"])
 render_market_group("🇺🇸 US market indices", ["S&P 500", "NASDAQ", "DOW JONES"], columns=3)
