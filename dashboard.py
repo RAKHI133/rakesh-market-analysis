@@ -91,68 +91,11 @@ st.markdown(f"""
   hr {{ border-color:{border_color}; }}
   a {{ color:{accent_color} !important; }}
   [data-testid="stCode"], pre, code {{ background: {surface_bg}; color: {text_color}; }}
-
-  /* High-contrast day/night styling for all Streamlit controls and data displays */
-  [data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] p,
-  [data-testid="stMarkdownContainer"] li, [data-testid="stMarkdownContainer"] span,
-  [data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label,
-  [data-testid="stRadio"] label, [data-testid="stCheckbox"] label,
-  [data-testid="stToggle"] label, [data-testid="stSelectbox"] label,
-  [data-testid="stMultiSelect"] label, [data-testid="stTextInput"] label,
-  [data-testid="stNumberInput"] label, [data-testid="stDateInput"] label,
-  [data-testid="stTimeInput"] label, [data-testid="stTextArea"] label {{
-    color: {text_color} !important;
-  }}
-  [data-testid="stTextInput"] input, [data-testid="stNumberInput"] input,
-  [data-testid="stDateInput"] input, [data-testid="stTimeInput"] input,
-  [data-testid="stTextArea"] textarea {{
-    color: {text_color} !important;
-    -webkit-text-fill-color: {text_color} !important;
-    caret-color: {accent_color} !important;
-    opacity: 1 !important;
-  }}
-  input::placeholder, textarea::placeholder {{
-    color: {muted_color} !important; opacity: 1 !important;
-  }}
-  [data-testid="stDataFrame"], [data-testid="stTable"] {{
-    background: {surface_bg} !important;
-    border: 1px solid {border_color} !important;
-    border-radius: 12px !important;
-  }}
-  [data-testid="stDataFrame"] iframe {{ color-scheme: {"light" if is_day_theme else "dark"} !important; }}
-  [data-testid="stButton"] button, [data-testid="stDownloadButton"] button,
-  [data-testid="stFormSubmitButton"] button {{
-    color: {text_color} !important;
-    background: {surface_bg} !important;
-    border: 1px solid {border_color} !important;
-  }}
-  [data-testid="stButton"] button:hover, [data-testid="stDownloadButton"] button:hover,
-  [data-testid="stFormSubmitButton"] button:hover {{
-    color: {accent_color} !important; border-color: {accent_color} !important;
-    background: {hover_bg} !important;
-  }}
-  [data-testid="stTabs"] button[role="tab"] p {{ color: {muted_color} !important; }}
-  [data-testid="stTabs"] button[aria-selected="true"] p {{ color: {accent_color} !important; }}
-  [data-testid="stAlert"] p, [data-testid="stAlert"] li {{ color: {text_color} !important; }}
-  [data-testid="stExpander"] summary, [data-testid="stExpander"] summary p {{
-    color: {text_color} !important;
-  }}
-  [data-testid="stMetricValue"], [data-testid="stMetricLabel"],
-  [data-testid="stMetricDelta"] {{ opacity: 1 !important; }}
-  .stSelectbox [data-baseweb="select"] *, [data-baseweb="popover"] *,
-  [data-baseweb="menu"] *, [role="listbox"] * {{
-    color: {text_color} !important;
-  }}
 </style>
 """, unsafe_allow_html=True)
 
 # Live clock runs inside its own browser frame, so it updates every second
 # without rerunning the dashboard or changing the 30-second market refresh.
-# Use an explicit dataframe theme so table text stays readable in both dashboard themes.
-def display_dataframe(data, *args, **kwargs):
-    kwargs.setdefault("theme", "light" if is_day_theme else "dark")
-    st.dataframe(data, *args, **kwargs)
-
 components.html(f"""
 <div class="hero">
   <div class="hero-kicker">Personal market terminal · India</div>
@@ -436,7 +379,7 @@ with tabs[1]:
                 rows.append({"Symbol":symbol,"Price":f"{currency}{last_close:,.2f}","SMA20":f"{currency}{float(s20):,.2f}","SMA50":f"{currency}{float(s50):,.2f}" if pd.notna(s50) else "—","RSI14":round(float(rsi(c).iloc[-1]),1),"Trend":trend})
         if rows:
             result = pd.DataFrame(rows)
-            display_dataframe(result, use_container_width=True, hide_index=True)
+            st.dataframe(result, use_container_width=True, hide_index=True)
             st.download_button("Download scanner CSV", result.to_csv(index=False), "scanner.csv", "text/csv")
         else: st.warning("No scanner data returned.")
 
@@ -584,7 +527,7 @@ with tabs[3]:
                 "date":"Date","fii_buy":"FII Buy (₹ Cr)","fii_sell":"FII Sell (₹ Cr)","fii_net":"FII Net (₹ Cr)",
                 "dii_buy":"DII Buy (₹ Cr)","dii_sell":"DII Sell (₹ Cr)","dii_net":"DII Net (₹ Cr)"
             })
-            display_dataframe(table.sort_values("Date", ascending=False), use_container_width=True, hide_index=True)
+            st.dataframe(table.sort_values("Date", ascending=False), use_container_width=True, hide_index=True)
             st.download_button("Download FII/DII CSV", table.to_csv(index=False), "fii_dii_history.csv", "text/csv")
             st.caption("Each row represents one trading day. Values are in ₹ crore; weekends and market holidays are excluded. Showing the latest five available trading sessions.")
 
@@ -639,7 +582,7 @@ with tabs[5]:
     if not trades.empty:
         view = trades.copy()
         view["P/L before costs"] = np.where(view.Exit>0,(view.Exit-view.Entry)*view.Quantity*np.where(view.Side=="BUY",1,-1),np.nan)
-        display_dataframe(view,use_container_width=True,hide_index=True)
+        st.dataframe(view,use_container_width=True,hide_index=True)
         st.download_button("Download paper journal CSV",view.to_csv(index=False),"paper_trades_backup.csv","text/csv")
 
 with tabs[6]:
@@ -812,7 +755,7 @@ with tabs[7]:
                 "Change %": change_pct,
                 "Data status": status,
             })
-        display_dataframe(pd.DataFrame(watchlist_rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(watchlist_rows), use_container_width=True, hide_index=True)
         st.caption("Watchlist quotes use the existing Yahoo Finance source and may be delayed, stale or unavailable. The dashboard refreshes every 30 seconds; watchlist quotes are cached for up to 25 seconds.")
     else:
         st.info("This watchlist is empty. Add a ticker above to start tracking it.")
@@ -900,7 +843,7 @@ with tabs[8]:
             ))
             fig_heat.update_layout(height=500, template=PLOTLY_TEMPLATE, paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG, margin=dict(l=8,r=8,t=20,b=8))
             st.plotly_chart(fig_heat, use_container_width=True)
-            display_dataframe(heat.sort_values("Change %", ascending=False), use_container_width=True, hide_index=True)
+            st.dataframe(heat.sort_values("Change %", ascending=False), use_container_width=True, hide_index=True)
             st.caption("Tile sizes are equal; colour represents percentage change. Only symbols with available quotes are shown.")
         else:
             st.warning("No usable quotes returned. Try refreshing later.")
@@ -959,7 +902,7 @@ with tabs[9]:
         m2.metric("Quoted value", f"₹{value_total:,.2f}" if pd.notna(value_total) else "Unavailable")
         m3.metric("Unrealized P/L", f"₹{pnl_total:+,.2f}" if pd.notna(pnl_total) else "Unavailable")
         m4.metric("Return", f"{pnl_total / invested_total * 100:+.2f}%" if pd.notna(pnl_total) and invested_total else "Unavailable")
-        display_dataframe(pf, use_container_width=True, hide_index=True)
+        st.dataframe(pf, use_container_width=True, hide_index=True)
         alloc = pf.dropna(subset=["Market Value"])
         if not alloc.empty and alloc["Market Value"].sum() > 0:
             fig_alloc = go.Figure(go.Pie(labels=alloc["Symbol"], values=alloc["Market Value"], hole=0.62))
