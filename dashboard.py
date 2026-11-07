@@ -300,19 +300,52 @@ tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "🧮 Options payoff", "�
 with tabs[0]:
     st.subheader("Price charts")
     st.markdown('<div class="section-note">Explore price history, moving averages, RSI and volume.</div>', unsafe_allow_html=True)
-    chart_symbols = {"NIFTY 50":"^NSEI","NIFTY BANK":"^NSEBANK","SENSEX":"^BSESN","RELIANCE":"RELIANCE.NS","HDFCBANK":"HDFCBANK.NS","ICICIBANK":"ICICIBANK.NS","INFY":"INFY.NS","TCS":"TCS.NS","SBIN":"SBIN.NS",
-                     "AAPL · Apple":"AAPL","MSFT · Microsoft":"MSFT","NVDA · NVIDIA":"NVDA","AMZN · Amazon":"AMZN","TSLA · Tesla":"TSLA","GOOGL · Alphabet":"GOOGL","META · Meta":"META"}
+    chart_symbols = {
+        # Indian indices
+        "NIFTY 50":"^NSEI", "NIFTY BANK":"^NSEBANK", "SENSEX":"^BSESN",
+        # Indian equities
+        "RELIANCE · Reliance Industries":"RELIANCE.NS",
+        "HDFCBANK · HDFC Bank":"HDFCBANK.NS",
+        "ICICIBANK · ICICI Bank":"ICICIBANK.NS",
+        "INFY · Infosys":"INFY.NS", "TCS · Tata Consultancy Services":"TCS.NS",
+        "SBIN · State Bank of India":"SBIN.NS", "ITC · ITC Ltd":"ITC.NS",
+        "LT · Larsen & Toubro":"LT.NS", "AXISBANK · Axis Bank":"AXISBANK.NS",
+        "KOTAKBANK · Kotak Mahindra Bank":"KOTAKBANK.NS",
+        "BAJFINANCE · Bajaj Finance":"BAJFINANCE.NS",
+        "TATAMOTORS · Tata Motors":"TATAMOTORS.NS",
+        "MARUTI · Maruti Suzuki":"MARUTI.NS",
+        "SUNPHARMA · Sun Pharma":"SUNPHARMA.NS",
+        "BHARTIARTL · Bharti Airtel":"BHARTIARTL.NS",
+        "HINDUNILVR · Hindustan Unilever":"HINDUNILVR.NS",
+        "ADANIENT · Adani Enterprises":"ADANIENT.NS",
+        "ONGC · Oil & Natural Gas Corp":"ONGC.NS",
+        "POWERGRID · Power Grid":"POWERGRID.NS",
+        "TATASTEEL · Tata Steel":"TATASTEEL.NS",
+        "WIPRO · Wipro":"WIPRO.NS", "HCLTECH · HCL Technologies":"HCLTECH.NS",
+        "ASIANPAINT · Asian Paints":"ASIANPAINT.NS", "NTPC · NTPC":"NTPC.NS",
+        "BEL · Bharat Electronics":"BEL.NS", "TRENT · Trent":"TRENT.NS",
+        # US equities
+        "AAPL · Apple":"AAPL", "MSFT · Microsoft":"MSFT",
+        "NVDA · NVIDIA":"NVDA", "AMZN · Amazon":"AMZN",
+        "TSLA · Tesla":"TSLA", "GOOGL · Alphabet":"GOOGL",
+        "META · Meta":"META", "BRK-B · Berkshire Hathaway":"BRK-B",
+        "JPM · JPMorgan Chase":"JPM", "V · Visa":"V", "MA · Mastercard":"MA",
+        "AVGO · Broadcom":"AVGO", "ORCL · Oracle":"ORCL", "AMD · AMD":"AMD",
+        "NFLX · Netflix":"NFLX", "COST · Costco":"COST", "WMT · Walmart":"WMT",
+        "XOM · Exxon Mobil":"XOM", "JNJ · Johnson & Johnson":"JNJ",
+        "KO · Coca-Cola":"KO", "DIS · Disney":"DIS", "CRM · Salesforce":"CRM"
+    }
     instrument = st.selectbox("Instrument", list(chart_symbols))
     chart_symbol = chart_symbols[instrument]
-    if chart_symbol in {"AAPL","MSFT","NVDA","AMZN","TSLA","GOOGL","META"}:
-        chart_currency = "$"
-        currency_label = "USD ($)"
-    elif chart_symbol.endswith((".NS", ".BO")):
+    if chart_symbol.endswith((".NS", ".BO")):
         chart_currency = "₹"
         currency_label = "INR (₹)"
-    else:
+    elif chart_symbol.startswith("^"):
         chart_currency = ""
         currency_label = "index points"
+    else:
+        chart_currency = "$"
+        currency_label = "USD ($)"
     st.caption("Selected instrument: " + instrument + " · Display currency: " + currency_label)
     period = st.selectbox("Period", ["1d","5d","1mo","3mo","6mo","1y","2y"], index=2)
     interval = st.selectbox("Interval", ["1m","5m","15m","1d"], index=3)
