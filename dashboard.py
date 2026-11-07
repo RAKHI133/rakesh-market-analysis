@@ -412,7 +412,7 @@ with tabs[0]:
             d["SMA20"] = d.Close.rolling(20).mean()
             d["SMA50"] = d.Close.rolling(50).mean()
             fig = go.Figure()
-            fig.add_trace(go.Candlestick(x=d.index, open=d.Open, high=d.High, low=d.Low, close=d.Close, name="Price"))
+            fig.add_trace(go.Scatter(x=d.index, y=d.Close, mode="lines", name="Price", line=dict(width=2.5)))
             fig.add_trace(go.Scatter(x=d.index, y=d.SMA20, name="SMA 20"))
             fig.add_trace(go.Scatter(x=d.index, y=d.SMA50, name="SMA 50"))
             fig.update_layout(height=480, xaxis_rangeslider_visible=False, template=PLOTLY_TEMPLATE, paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG, yaxis_tickprefix=chart_currency, margin=dict(l=12,r=12,t=35,b=12), legend=dict(orientation="h", y=1.02))
