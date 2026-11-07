@@ -41,46 +41,55 @@ with theme_control:
 PLOTLY_TEMPLATE = "plotly_white" if is_day_theme else "plotly_dark"
 PLOT_BG = "#ffffff" if is_day_theme else "#101827"
 
-# ---------- Visual system: compact, clear, and responsive ----------
+# ---------- Full dashboard theme tokens ----------
 if is_day_theme:
-    app_bg, sidebar_bg = "#f3f6fb", "#e9eef6"
-    border_color, text_color, muted_color = "#d7dfeb", "#172338", "#5b6b82"
-    hero_bg = "linear-gradient(115deg,#e2edff 0%,#f5f8ff 58%,#e2f5f1 100%)"
-    hero_border, hero_title, hero_sub, accent_color = "#c5d5ec", "#14243b", "#52657e", "#1769aa"
+    app_bg, surface_bg, sidebar_bg = "#f4f7fb", "#ffffff", "#eaf0f7"
+    border_color, text_color, muted_color = "#d6dfeb", "#172338", "#586a82"
+    hero_bg = "linear-gradient(115deg,#e3edfb 0%,#f8fbff 58%,#e4f3ef 100%)"
+    hero_border, hero_title, hero_sub, accent_color = "#c5d5e8", "#14243b", "#52657e", "#1769aa"
     metric_bg = "linear-gradient(145deg,#ffffff,#f4f7fc)"
+    input_bg, hover_bg = "#ffffff", "#e8f0fa"
 else:
-    app_bg, sidebar_bg = "#0b1020", "#10182b"
+    app_bg, surface_bg, sidebar_bg = "#0b1020", "#101827", "#10182b"
     border_color, text_color, muted_color = "#263650", "#d9e6f5", "#91a3bb"
     hero_bg = "linear-gradient(115deg,#152744 0%,#101b30 58%,#102a35 100%)"
     hero_border, hero_title, hero_sub, accent_color = "#2a4261", "#f2f6fc", "#b5c5d9", "#7dd3fc"
     metric_bg = "linear-gradient(145deg,#151f34,#111a2b)"
+    input_bg, hover_bg = "#111c30", "#1b2a42"
 
 st.markdown(f"""
 <style>
-  :root {{ color-scheme: {"light" if is_day_theme else "dark"}; }}
+  :root {{ color-scheme: {"light" if is_day_theme else "dark"}; --background-color: {app_bg}; --secondary-background-color: {surface_bg}; --text-color: {text_color}; --primary-color: {accent_color}; }}
+  html, body, [data-testid="stApp"], [data-testid="stAppViewContainer"], [data-testid="stMain"], [data-testid="stMainBlockContainer"], [data-testid="stHeader"], [data-testid="stBottom"] {{ background: {app_bg} !important; color: {text_color} !important; }}
   .block-container {{ max-width: 1480px; padding-top: 1.1rem; padding-bottom: 2.5rem; }}
-  [data-testid="stAppViewContainer"] {{ background: {app_bg}; }}
-  [data-testid="stHeader"] {{ background: {app_bg}; }}
-  [data-testid="stSidebar"] {{ background: {sidebar_bg}; border-right: 1px solid {border_color}; }}
-  [data-testid="stAppViewContainer"], [data-testid="stMain"] {{ color: {text_color}; }}
-  h1, h2, h3, p, label {{ color: {text_color}; letter-spacing: -.015em; }}
+  [data-testid="stHeader"] {{ background: {app_bg} !important; }}
+  [data-testid="stSidebar"], [data-testid="stSidebar"] > div {{ background: {sidebar_bg} !important; border-right: 1px solid {border_color}; }}
+  [data-testid="stVerticalBlock"], [data-testid="stHorizontalBlock"] {{ color: {text_color}; }}
+  h1, h2, h3, h4, h5, p, label, li, span, small, strong, em, [data-testid="stMarkdownContainer"], [data-testid="stCaptionContainer"] {{ color: {text_color}; }}
   h1 {{ font-size: clamp(1.7rem, 3vw, 2.35rem) !important; }}
-  [data-testid="stMetric"] {{ background: {metric_bg}; border: 1px solid {border_color}; border-radius: 14px; padding: 14px 16px; min-height: 112px; }}
-  [data-testid="stMetricLabel"] {{ color: {muted_color} !important; font-size: .86rem; }}
-  [data-testid="stMetricValue"] {{ color: {text_color}; font-size: clamp(1.2rem,2vw,1.8rem); }}
+  [data-testid="stCaptionContainer"], .section-note {{ color: {muted_color} !important; }}
+  [data-testid="stMetric"] {{ background: {metric_bg} !important; border: 1px solid {border_color}; border-radius: 14px; padding: 14px 16px; min-height: 112px; }}
+  [data-testid="stMetricLabel"] {{ color: {muted_color} !important; }}
+  [data-testid="stMetricValue"] {{ color: {text_color} !important; }}
   [data-testid="stMetricDelta"] {{ font-size: .82rem; }}
-  div[data-testid="stTabs"] button[role="tab"] {{ padding: .7rem .9rem; color: {muted_color}; }}
-  div[data-testid="stTabs"] button[aria-selected="true"] {{ color: {accent_color}; }}
+  [data-testid="stTabs"] button[role="tab"] {{ color: {muted_color} !important; }}
+  [data-testid="stTabs"] button[aria-selected="true"] {{ color: {accent_color} !important; }}
+  [data-testid="stTabs"] [data-baseweb="tab-highlight"] {{ background: {accent_color} !important; }}
   .hero {{ background: {hero_bg}; border: 1px solid {hero_border}; border-radius: 18px; padding: 1.15rem 1.35rem; margin: .15rem 0 1.1rem; }}
   .hero-kicker {{ color:{accent_color}; text-transform:uppercase; letter-spacing:.13em; font-size:.72rem; font-weight:700; }}
   .hero-title {{ color:{hero_title}; font-size:1.55rem; font-weight:750; margin:.2rem 0; }}
   .hero-sub {{ color:{hero_sub}; font-size:.9rem; }}
-  .section-note {{ color:{muted_color}; font-size:.82rem; margin-top:-.45rem; }}
   .market-heading {{ color:{text_color}; font-size:1rem; font-weight:700; margin:.85rem 0 .45rem; }}
-  .stButton button, .stDownloadButton button {{ border-radius:10px; }}
+  [data-testid="stTextInput"] input, [data-testid="stNumberInput"] input, [data-testid="stDateInput"] input, [data-testid="stTimeInput"] input, [data-testid="stTextArea"] textarea, [data-testid="stSelectbox"] [data-baseweb="select"] > div, [data-testid="stMultiSelect"] [data-baseweb="select"] > div {{ background: {input_bg} !important; color: {text_color} !important; border-color: {border_color} !important; }}
+  [data-baseweb="popover"], [data-baseweb="menu"], [role="listbox"], [data-baseweb="select"] [role="option"] {{ background: {surface_bg} !important; color: {text_color} !important; }}
+  [data-baseweb="select"] [role="option"]:hover {{ background: {hover_bg} !important; }}
+  [data-testid="stExpander"], [data-testid="stForm"], [data-testid="stAlert"], [data-testid="stDataFrame"], [data-testid="stTable"] {{ background: {surface_bg}; border-color: {border_color} !important; }}
   [data-testid="stDataFrame"] {{ border:1px solid {border_color}; border-radius:12px; overflow:hidden; }}
-  hr {{ border-color:{border_color}; }}
+  [data-testid="stButton"] button, [data-testid="stDownloadButton"] button {{ border-radius:10px; border-color:{border_color}; }}
   [data-testid="stToggle"] {{ justify-content:flex-end; }}
+  hr {{ border-color:{border_color}; }}
+  a {{ color:{accent_color} !important; }}
+  [data-testid="stCode"], pre, code {{ background: {surface_bg}; color: {text_color}; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -502,7 +511,7 @@ with tabs[2]:
         pnl = (intrinsic-premium)*qty-costs
         fig = go.Figure(go.Scatter(x=prices,y=pnl,mode="lines",name="Expiry P/L"))
         fig.add_hline(y=0,line_dash="dash")
-        fig.update_layout(height=350,xaxis_title="Underlying at expiry",yaxis_title="Estimated P/L (₹)",template="plotly_dark",paper_bgcolor="#101827",plot_bgcolor="#101827")
+        fig.update_layout(height=350,xaxis_title="Underlying at expiry",yaxis_title="Estimated P/L (₹)",template=PLOTLY_TEMPLATE,paper_bgcolor=PLOT_BG,plot_bgcolor=PLOT_BG)
         st.plotly_chart(fig,use_container_width=True)
         st.write(f"Break-even: ₹{(strike+premium if option.startswith('CE') else strike-premium):,.2f}")
         st.write(f"Maximum long-option loss: ₹{premium*qty+costs:,.2f}")
@@ -919,7 +928,7 @@ with tabs[8]:
                 customdata=heat[["Change %", "Price"]].to_numpy(),
                 hovertemplate="<b>%{label}</b><br>Change: %{customdata[0]:+.2f}%<br>Price: %{customdata[1]:,.2f}<extra></extra>"
             ))
-            fig_heat.update_layout(height=500, template="plotly_dark", paper_bgcolor="#101827", plot_bgcolor="#101827", margin=dict(l=8,r=8,t=20,b=8))
+            fig_heat.update_layout(height=500, template=PLOTLY_TEMPLATE, paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG, margin=dict(l=8,r=8,t=20,b=8))
             st.plotly_chart(fig_heat, use_container_width=True)
             st.dataframe(heat.sort_values("Change %", ascending=False), use_container_width=True, hide_index=True)
             st.caption("Tile sizes are equal; colour represents percentage change. Only symbols with available quotes are shown.")
@@ -984,7 +993,7 @@ with tabs[9]:
         alloc = pf.dropna(subset=["Market Value"])
         if not alloc.empty and alloc["Market Value"].sum() > 0:
             fig_alloc = go.Figure(go.Pie(labels=alloc["Symbol"], values=alloc["Market Value"], hole=0.62))
-            fig_alloc.update_layout(title="Portfolio allocation", height=350, template="plotly_dark", paper_bgcolor="#101827", plot_bgcolor="#101827")
+            fig_alloc.update_layout(title="Portfolio allocation", height=350, template=PLOTLY_TEMPLATE, paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG)
             st.plotly_chart(fig_alloc, use_container_width=True)
         remove = st.selectbox("Remove holding", ["Select"] + [x["Symbol"] for x in holdings], key="portfolio_remove")
         if st.button("Remove selected holding", key="portfolio_remove_btn", disabled=remove == "Select"):
