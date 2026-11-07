@@ -286,9 +286,33 @@ def render_market_group(title, names, columns=4):
             if q:
                 value = f"{prefix}{q[0]:,.2f}" + (f" {suffix}" if suffix else "")
                 delta = f"{q[1]:+,.2f} ({q[2]:+.2f}%)"
-                st.metric(name, value, delta)
+                if name == "NIFTY 50":
+                    delta_color = "#16a34a" if q[1] >= 0 else "#dc2626"
+                    st.markdown(
+                        f'<a href="https://www.nseindia.com/static/products-services/indices-nifty50-index" target="_blank" rel="noopener noreferrer" '
+                        f'style="display:block;text-decoration:none;background:{metric_bg};border:1px solid {border_color};'
+                        f'border-radius:14px;padding:14px 16px;min-height:112px;">'
+                        f'<div style="font-size:.9rem;font-weight:600;color:{accent_color};">NIFTY 50 ↗</div>'
+                        f'<div style="font-size:1.65rem;font-weight:650;color:{text_color};margin-top:5px;">{value}</div>'
+                        f'<div style="font-size:.82rem;color:{delta_color};margin-top:4px;">{delta}</div>'
+                        f'</a>',
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.metric(name, value, delta)
             else:
-                st.metric(name, "Unavailable")
+                if name == "NIFTY 50":
+                    st.markdown(
+                        '<a href="https://www.nseindia.com/static/products-services/indices-nifty50-index" target="_blank" rel="noopener noreferrer" '
+                        f'style="display:block;text-decoration:none;background:{metric_bg};border:1px solid {border_color};'
+                        f'border-radius:14px;padding:14px 16px;min-height:112px;">'
+                        f'<div style="font-size:.9rem;font-weight:600;color:{accent_color};">NIFTY 50 ↗</div>'
+                        f'<div style="font-size:1.2rem;color:{muted_color};margin-top:12px;">Unavailable · Open index</div>'
+                        '</a>',
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.metric(name, "Unavailable")
 
 render_market_group("🇮🇳 Indian markets", ["NIFTY 50", "NIFTY BANK", "SENSEX", "INDIA VIX"])
 render_market_group("🇺🇸 US market indices", ["S&P 500", "NASDAQ", "DOW JONES"], columns=3)
