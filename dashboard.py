@@ -147,7 +147,7 @@ symbols = {
     "INDIA VIX":"^INDIAVIX", "S&P 500":"^GSPC", "NASDAQ":"^IXIC", "DOW JONES":"^DJI",
     "Apple (AAPL)":"AAPL", "Microsoft (MSFT)":"MSFT", "NVIDIA (NVDA)":"NVDA",
     "Amazon (AMZN)":"AMZN", "Tesla (TSLA)":"TSLA", "Alphabet (GOOGL)":"GOOGL", "Meta (META)":"META",
-    "WTI Crude":"CL=F", "Brent Crude":"BZ=F", "USD/INR":"INR=X"
+    "Gold Futures (COMEX)":"GC=F", "Silver Futures (COMEX)":"SI=F", "USD/INR":"INR=X"
 }
 # Values are displayed in their native market convention. Index values are points, not currency.
 QUOTE_FORMAT = {
@@ -155,7 +155,8 @@ QUOTE_FORMAT = {
     "INDIA VIX": ("", ""), "S&P 500": ("", "pts"), "NASDAQ": ("", "pts"), "DOW JONES": ("", "pts"),
     "Apple (AAPL)": ("$", ""), "Microsoft (MSFT)": ("$", ""), "NVIDIA (NVDA)": ("$", ""),
     "Amazon (AMZN)": ("$", ""), "Tesla (TSLA)": ("$", ""), "Alphabet (GOOGL)": ("$", ""), "Meta (META)": ("$", ""),
-    "WTI Crude": ("$", "/barrel"), "Brent Crude": ("$", "/barrel"), "USD/INR": ("₹", "per USD"),
+    "Gold Futures (COMEX)": ("$", "/troy oz"), "Silver Futures (COMEX)": ("$", "/troy oz"),
+    "USD/INR": ("₹", "per USD"),
 }
 
 @st.cache_data(ttl=25, show_spinner=False)
@@ -285,8 +286,9 @@ def render_market_group(title, names, columns=4):
 render_market_group("🇮🇳 Indian markets", ["NIFTY 50", "NIFTY BANK", "SENSEX", "INDIA VIX"])
 render_market_group("🇺🇸 US market indices", ["S&P 500", "NASDAQ", "DOW JONES"], columns=3)
 render_market_group("🇺🇸 US stocks · USD", ["Apple (AAPL)", "Microsoft (MSFT)", "NVIDIA (NVDA)", "Amazon (AMZN)", "Tesla (TSLA)", "Alphabet (GOOGL)", "Meta (META)"], columns=4)
-render_market_group("🌐 Commodities & currency", ["WTI Crude", "Brent Crude", "USD/INR"], columns=3)
-st.caption("Indices are shown in points. WTI Crude is shown in USD per barrel; USD/INR is rupees per US dollar. Quotes depend on Yahoo Finance availability and may be delayed.")
+render_market_group("🥇 Precious metals", ["Gold Futures (COMEX)", "Silver Futures (COMEX)"], columns=2)
+render_market_group("💱 Currency", ["USD/INR"], columns=1)
+st.caption("Gold and silver are COMEX futures quoted in USD per troy ounce. USD/INR is rupees per US dollar. Yahoo Finance quotes may be delayed, stale or unavailable; these are not MCX INR contract prices.")
 refresh_col, status_col = st.columns([1, 4])
 with refresh_col:
     if st.button("↻ Refresh data now", key="clear_market_data", use_container_width=True):
@@ -411,7 +413,9 @@ with tabs[0]:
         "AVGO · Broadcom":"AVGO", "ORCL · Oracle":"ORCL", "AMD · AMD":"AMD",
         "NFLX · Netflix":"NFLX", "COST · Costco":"COST", "WMT · Walmart":"WMT",
         "XOM · Exxon Mobil":"XOM", "JNJ · Johnson & Johnson":"JNJ",
-        "KO · Coca-Cola":"KO", "DIS · Disney":"DIS", "CRM · Salesforce":"CRM"
+        "KO · Coca-Cola":"KO", "DIS · Disney":"DIS", "CRM · Salesforce":"CRM",
+        # Precious metals only (Yahoo Finance continuous COMEX futures)
+        "Gold Futures (COMEX)":"GC=F", "Silver Futures (COMEX)":"SI=F"
     }
     instrument = st.selectbox("Instrument", list(chart_symbols))
     chart_symbol = chart_symbols[instrument]
