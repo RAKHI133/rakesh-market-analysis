@@ -303,7 +303,7 @@ with refresh_col:
 with status_col:
     st.caption(f"Last page refresh: {datetime.now(ZoneInfo('Asia/Kolkata')):%I:%M:%S %p IST} · Automatic refresh interval: 30 seconds")
 
-tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "🧮 Options payoff", "🏦 FII / DII", "🛡️ Risk calculator", "📝 Paper journal", "🔗 Resources", "⭐ Watchlists", "🗺️ Market Heatmap", "💼 Portfolio"])
+tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "🧮 Options payoff", "🏦 FII / DII", "🛡️ Risk calculator", "📝 Paper journal", "🔗 Resources", "⭐ Watchlists", "💼 Portfolio"])
 
 with tabs[0]:
     st.subheader("Price charts")
@@ -952,50 +952,7 @@ with tabs[7]:
         else:
             st.caption("Keep at least one watchlist. You can remove all its symbols instead.")
 
-# ---------- Market heatmap: free Yahoo Finance quotes ----------
-with tabs[8]:
-    st.subheader("Market heatmap")
-    st.caption("Equal-sized tiles coloured by latest percentage move. Yahoo Finance quotes may be delayed.")
-    groups = {
-        "Banking": ["HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS", "AXISBANK.NS", "KOTAKBANK.NS"],
-        "IT": ["TCS.NS", "INFY.NS", "WIPRO.NS", "HCLTECH.NS", "TECHM.NS"],
-        "Energy": ["RELIANCE.NS", "ONGC.NS", "NTPC.NS", "POWERGRID.NS"],
-        "Auto": ["MARUTI.NS", "TATAMOTORS.NS", "M&M.NS", "BAJAJ-AUTO.NS"],
-        "FMCG": ["ITC.NS", "HINDUNILVR.NS", "TATACONSUM.NS", "NESTLEIND.NS"],
-        "Pharma": ["SUNPHARMA.NS", "DRREDDY.NS", "CIPLA.NS", "DIVISLAB.NS"],
-    }
-    heat_symbols = [s for values in groups.values() for s in values]
-    if st.button("Load / refresh market heatmap", key="load_market_heatmap"):
-        with st.spinner("Loading market moves..."):
-            st.session_state["heatmap_quotes"] = get_watchlist_quotes(tuple(heat_symbols))
-    if "heatmap_quotes" in st.session_state:
-        qmap = st.session_state["heatmap_quotes"]
-        rows = []
-        for sector, names in groups.items():
-            for symbol in names:
-                q = qmap.get(symbol)
-                if q and q[2] is not None:
-                    rows.append({"Sector": sector, "Symbol": symbol.replace(".NS", ""), "Change %": float(q[2]), "Price": float(q[0])})
-        if rows:
-            heat = pd.DataFrame(rows)
-            fig_heat = go.Figure(go.Treemap(
-                labels=heat["Symbol"], parents=heat["Sector"],
-                ids=heat["Sector"] + "/" + heat["Symbol"], values=np.ones(len(heat)),
-                marker=dict(colors=heat["Change %"], colorscale=[[0, "#b91c1c"], [0.5, "#263650"], [1, "#047857"]], cmid=0, colorbar=dict(title="Change %")),
-                customdata=heat[["Change %", "Price"]].to_numpy(),
-                hovertemplate="<b>%{label}</b><br>Change: %{customdata[0]:+.2f}%<br>Price: %{customdata[1]:,.2f}<extra></extra>"
-            ))
-            fig_heat.update_layout(height=500, template=PLOTLY_TEMPLATE, paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG, margin=dict(l=8,r=8,t=20,b=8))
-            st.plotly_chart(fig_heat, use_container_width=True)
-            st.dataframe(heat.sort_values("Change %", ascending=False), use_container_width=True, hide_index=True)
-            st.caption("Tile sizes are equal; colour represents percentage change. Only symbols with available quotes are shown.")
-        else:
-            st.warning("No usable quotes returned. Try refreshing later.")
-    else:
-        st.info("Load the heatmap when needed. Data is fetched on demand to keep startup fast.")
-
-
-# ---------- Portfolio analytics: session holdings and CSV backup ----------
+# ---------- Market he analytics: session holdings and CSV backup ----------
 with tabs[9]:
     st.subheader("Portfolio analytics")
     st.caption("Manually entered holdings valued using available Yahoo Finance quotes. Not connected to a broker.")
