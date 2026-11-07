@@ -1,5 +1,6 @@
 import json
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -93,14 +94,42 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-now_ist = datetime.now(ZoneInfo("Asia/Kolkata"))
-st.markdown(f"""
+# Live clock runs inside its own browser frame, so it updates every second
+# without rerunning the dashboard or changing the 30-second market refresh.
+components.html(f"""
 <div class="hero">
   <div class="hero-kicker">Personal market terminal · India</div>
   <div class="hero-title">📈 Rakesh Market Analysis</div>
-  <div class="hero-sub">{now_ist:%A, %d %b %Y} · {now_ist:%I:%M:%S %p} IST &nbsp;|&nbsp; Refreshes every 30 seconds</div>
+  <div class="hero-sub"><span id="india-live-clock">Loading India time…</span> IST &nbsp;|&nbsp; Market data refreshes every 30 seconds</div>
 </div>
-""", unsafe_allow_html=True)
+<style>
+  html, body {{ margin:0; padding:0; background:transparent; }}
+  .hero {{ background:{hero_bg}; border:1px solid {hero_border}; border-radius:18px;
+           padding:1.15rem 1.35rem; margin:.15rem 0 1.1rem;
+           font-family:Arial,sans-serif; box-sizing:border-box; }}
+  .hero-kicker {{ color:{accent_color}; text-transform:uppercase; letter-spacing:.13em;
+                  font-size:.72rem; font-weight:700; }}
+  .hero-title {{ color:{hero_title}; font-size:1.55rem; font-weight:750; margin:.2rem 0; }}
+  .hero-sub {{ color:{hero_sub}; font-size:.9rem; }}
+</style>
+<script>
+(function () {{
+  const clock = document.getElementById("india-live-clock");
+  const dateFormatter = new Intl.DateTimeFormat("en-IN", {{
+    timeZone:"Asia/Kolkata", weekday:"long", day:"2-digit", month:"short", year:"numeric"
+  }});
+  const timeFormatter = new Intl.DateTimeFormat("en-IN", {{
+    timeZone:"Asia/Kolkata", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:true
+  }});
+  function updateIndiaClock() {{
+    const now = new Date();
+    clock.textContent = dateFormatter.format(now) + " · " + timeFormatter.format(now);
+  }}
+  updateIndiaClock();
+  setInterval(updateIndiaClock, 1000);
+}})();
+</script>
+""", height=145, scrolling=False)
 
 with st.expander("About market data & important limitations", expanded=False):
     st.info("Market prices use Yahoo Finance intraday data where available. It is unofficial, may be delayed or unavailable, and is not guaranteed exchange real-time data. This dashboard is for research and paper trading, not investment advice.")
