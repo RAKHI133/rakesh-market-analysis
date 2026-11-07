@@ -145,16 +145,12 @@ def get_history(symbol, period="6mo", interval="1d"):
 symbols = {
     "NIFTY 50":"^NSEI", "NIFTY BANK":"^NSEBANK", "SENSEX":"^BSESN",
     "INDIA VIX":"^INDIAVIX", "S&P 500":"^GSPC", "NASDAQ":"^IXIC", "DOW JONES":"^DJI",
-    "Apple (AAPL)":"AAPL", "Microsoft (MSFT)":"MSFT", "NVIDIA (NVDA)":"NVDA",
-    "Amazon (AMZN)":"AMZN", "Tesla (TSLA)":"TSLA", "Alphabet (GOOGL)":"GOOGL", "Meta (META)":"META",
     "Gold Futures (COMEX)":"GC=F", "Silver Futures (COMEX)":"SI=F", "USD/INR":"INR=X"
 }
 # Values are displayed in their native market convention. Index values are points, not currency.
 QUOTE_FORMAT = {
     "NIFTY 50": ("", "pts"), "NIFTY BANK": ("", "pts"), "SENSEX": ("", "pts"),
     "INDIA VIX": ("", ""), "S&P 500": ("", "pts"), "NASDAQ": ("", "pts"), "DOW JONES": ("", "pts"),
-    "Apple (AAPL)": ("$", ""), "Microsoft (MSFT)": ("$", ""), "NVIDIA (NVDA)": ("$", ""),
-    "Amazon (AMZN)": ("$", ""), "Tesla (TSLA)": ("$", ""), "Alphabet (GOOGL)": ("$", ""), "Meta (META)": ("$", ""),
     "Gold Futures (COMEX)": ("$", "/troy oz"), "Silver Futures (COMEX)": ("$", "/troy oz"),
     "USD/INR": ("₹", "per USD"),
 }
@@ -285,7 +281,6 @@ def render_market_group(title, names, columns=4):
 
 render_market_group("🇮🇳 Indian markets", ["NIFTY 50", "NIFTY BANK", "SENSEX", "INDIA VIX"])
 render_market_group("🇺🇸 US market indices", ["S&P 500", "NASDAQ", "DOW JONES"], columns=3)
-render_market_group("🇺🇸 US stocks · USD", ["Apple (AAPL)", "Microsoft (MSFT)", "NVIDIA (NVDA)", "Amazon (AMZN)", "Tesla (TSLA)", "Alphabet (GOOGL)", "Meta (META)"], columns=4)
 render_market_group("🥇 Precious metals", ["Gold Futures (COMEX)", "Silver Futures (COMEX)"], columns=2)
 render_market_group("💱 Currency", ["USD/INR"], columns=1)
 st.caption("Gold and silver are COMEX futures quoted in USD per troy ounce. USD/INR is rupees per US dollar. Yahoo Finance quotes may be delayed, stale or unavailable; these are not MCX INR contract prices.")
@@ -404,16 +399,6 @@ with tabs[0]:
         "TVSMOTOR · TVS Motor":"TVSMOTOR.NS",
         "VBL · Varun Beverages":"VBL.NS",
         "YESBANK · Yes Bank":"YESBANK.NS",
-        # US equities
-        "AAPL · Apple":"AAPL", "MSFT · Microsoft":"MSFT",
-        "NVDA · NVIDIA":"NVDA", "AMZN · Amazon":"AMZN",
-        "TSLA · Tesla":"TSLA", "GOOGL · Alphabet":"GOOGL",
-        "META · Meta":"META", "BRK-B · Berkshire Hathaway":"BRK-B",
-        "JPM · JPMorgan Chase":"JPM", "V · Visa":"V", "MA · Mastercard":"MA",
-        "AVGO · Broadcom":"AVGO", "ORCL · Oracle":"ORCL", "AMD · AMD":"AMD",
-        "NFLX · Netflix":"NFLX", "COST · Costco":"COST", "WMT · Walmart":"WMT",
-        "XOM · Exxon Mobil":"XOM", "JNJ · Johnson & Johnson":"JNJ",
-        "KO · Coca-Cola":"KO", "DIS · Disney":"DIS", "CRM · Salesforce":"CRM",
         # Precious metals only (Yahoo Finance continuous COMEX futures)
         "Gold Futures (COMEX)":"GC=F", "Silver Futures (COMEX)":"SI=F"
     }
@@ -464,7 +449,6 @@ with tabs[1]:
     st.markdown('<div class="section-note">Compare selected symbols using the existing SMA and RSI checks.</div>', unsafe_allow_html=True)
     scanner_presets = {
         "Indian large caps": "RELIANCE.NS,HDFCBANK.NS,ICICIBANK.NS,INFY.NS,TCS.NS,SBIN.NS,ITC.NS,LT.NS",
-        "US mega-cap stocks": "AAPL,MSFT,NVDA,AMZN,TSLA,GOOGL,META",
         "Custom symbols": ""
     }
     scanner_preset = st.radio("Watchlist preset", list(scanner_presets), horizontal=True)
@@ -778,7 +762,6 @@ with tabs[7]:
 
     starter_watchlists = {
         "India starter": ["RELIANCE.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS", "TCS.NS"],
-        "US starter": ["AAPL", "MSFT", "NVDA", "AMZN", "TSLA", "GOOGL", "META"],
     }
     if "personal_watchlists" not in st.session_state:
         st.session_state["personal_watchlists"] = {name: tickers.copy() for name, tickers in starter_watchlists.items()}
