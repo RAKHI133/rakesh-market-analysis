@@ -303,7 +303,7 @@ with refresh_col:
 with status_col:
     st.caption(f"Last page refresh: {datetime.now(ZoneInfo('Asia/Kolkata')):%I:%M:%S %p IST} · Automatic refresh interval: 30 seconds")
 
-tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "🧮 Options payoff", "🏦 FII / DII", "🛡️ Risk calculator", "📝 Paper journal", "🔗 Resources", "⭐ Watchlists", "💼 Portfolio"])
+tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "⚡ Intraday toolkit", "🏦 FII / DII", "🛡️ Risk calculator", "📝 Paper journal", "🔗 Resources", "⭐ Watchlists", "💼 Portfolio"])
 
 with tabs[0]:
     st.subheader("Price charts")
@@ -529,30 +529,88 @@ with tabs[1]:
         else: st.warning("No scanner data returned.")
 
 with tabs[2]:
-    st.subheader("Manual options expiry payoff")
-    st.caption("Manual estimate only; no live option-chain, premium, Greeks, or IV feed.")
-    a,b,c = st.columns(3)
-    with a:
-        option = st.selectbox("Option type", ["CE (Call)","PE (Put)"])
-        strike = st.number_input("Strike", min_value=0.0, value=25000.0, step=50.0)
-        premium = st.number_input("Premium per unit (₹)", min_value=0.0, value=150.0)
-    with b:
-        qty = st.number_input("Quantity / units", min_value=1, value=75)
-        low = st.number_input("Scenario low", min_value=0.0, value=24000.0)
-        high = st.number_input("Scenario high", min_value=0.0, value=26000.0)
-    with c:
-        costs = st.number_input("Estimated costs (₹)", min_value=0.0, value=0.0)
-    if high > low:
-        prices = np.linspace(low, high, 101)
-        intrinsic = np.maximum(prices-strike,0) if option.startswith("CE") else np.maximum(strike-prices,0)
-        pnl = (intrinsic-premium)*qty-costs
-        fig = go.Figure(go.Scatter(x=prices,y=pnl,mode="lines",name="Expiry P/L"))
-        fig.add_hline(y=0,line_dash="dash")
-        fig.update_layout(height=350,xaxis_title="Underlying at expiry",yaxis_title="Estimated P/L (₹)",template=PLOTLY_TEMPLATE,paper_bgcolor=PLOT_BG,plot_bgcolor=PLOT_BG)
-        st.plotly_chart(fig,use_container_width=True)
-        st.write(f"Break-even: ₹{(strike+premium if option.startswith('CE') else strike-premium):,.2f}")
-        st.write(f"Maximum long-option loss: ₹{premium*qty+costs:,.2f}")
-    else: st.error("Scenario high must exceed scenario low.")
+    st.subheader("Intraday trading toolkit")
+    st.caption("Intraday charts and indicators from Yahoo Finance. Quotes can be delayed, incomplete or unavailable; confirm prices with your broker before trading.")
+
+    intraday_symbols = {
+        "NIFTY 50": "^NSEI", "NIFTY BANK": "^NSEBANK", "SENSEX": "^BSESN",
+        "RELIANCE": "RELIANCE.NS", "HDFCBANK": "HDFCBANK.NS", "ICICIBANK": "ICICIBANK.NS",
+        "SBIN": "SBIN.NS", "INFY": "INFY.NS", "TCS": "TCS.NS", "ITC": "ITC.NS",
+        "LT": "LT.NS", "AXISBANK": "AXISBANK.NS", "TATAMOTORS": "TATAMOTORS.NS",
+        "AAPL (US)": "AAPL", "TSLA (US)": "TSLA"
+    }
+    controls = st.columns([2, 1, 1])
+    selected_name = controls[0].selectbox("Instrument", list(intraday_symbols.keys()), key="intraday_symbol")
+    interval = controls[1].selectbox("Candle interval", ["1m", "2m", "5m", "15m", "30m", "60m"], index=2, key="intraday_interval")
+    period = controls[2].selectbox("Lookback", ["1d", "5d"], index=1 if interval not in ("1m", "2m") else 0, key="intraday_period")
+    ticker = intraday_symbols[selected_name]
+
+    @st.cache_data(ttl=30, show_spinner=False)
+    def get_intraday_history(symbol, selected_period, selected_interval):
+        try:
+            frame = yf.Ticker(symbol).history(period=selected_period, interval=selected_interval, auto_adjust=False)
+            if frame is None or frame.empty:
+                return pd.DataFrame()
+            return frame.dropna(subset=["Open", "High", "Low", "Close"])
+        except Exception:
+            return pd.DataFrame()
+
+    with st.spinner("Loading intraday candles..."):
+        intraday = get_intraday_history(ticker, period, interval)
+
+    if intraday.empty:
+        st.warning("Intraday data is unavailable for this instrument and interval. Try another interval or lookback.")
+    else:
+        intraday = intraday.copy()
+        intraday["EMA 9"] = intraday["Close"].ewm(span=9, adjust=False).mean()
+        intraday["EMA 20"] = intraday["Close"].ewm(span=20, adjust=False).mean()
+        typical_price = (intraday["High"] + intraday["Low"] + intraday["Close"]) / 3
+        volume = intraday["Volume"].fillna(0)
+        cumulative_volume = volume.cumsum()
+        intraday["VWAP"] = (typical_price * volume).cumsum() / cumulative_volume.replace(0, np.nan)
+        intraday["RSI 14"] = rsi(intraday["Close"], 14)
+
+        last = intraday.iloc[-1]
+        previous_close = float(intraday["Close"].iloc[-2]) if len(intraday) > 1 else float(last["Open"])
+        day_change = float(last["Close"]) - previous_close
+        day_change_pct = day_change / previous_close * 100 if previous_close else 0
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Latest price", f"{last['Close']:,.2f}", f"{day_change:+,.2f} ({day_change_pct:+.2f}%)")
+        m2.metric("Session high", f"{intraday['High'].max():,.2f}")
+        m3.metric("Session low", f"{intraday['Low'].min():,.2f}")
+        m4.metric("RSI (14)", f"{last['RSI 14']:.1f}" if pd.notna(last["RSI 14"]) else "—")
+
+        candle = go.Figure()
+        candle.add_trace(go.Candlestick(x=intraday.index, open=intraday["Open"], high=intraday["High"],
+                                        low=intraday["Low"], close=intraday["Close"], name="Price"))
+        candle.add_trace(go.Scatter(x=intraday.index, y=intraday["EMA 9"], name="EMA 9", line=dict(width=1.4)))
+        candle.add_trace(go.Scatter(x=intraday.index, y=intraday["EMA 20"], name="EMA 20", line=dict(width=1.4)))
+        if intraday["VWAP"].notna().any():
+            candle.add_trace(go.Scatter(x=intraday.index, y=intraday["VWAP"], name="VWAP", line=dict(width=1.5, dash="dot")))
+        candle.update_layout(height=520, xaxis_title="Time", yaxis_title="Price",
+                             template=PLOTLY_TEMPLATE, paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG,
+                             xaxis_rangeslider_visible=False, legend_orientation="h")
+        st.plotly_chart(candle, use_container_width=True)
+
+        volume_fig = go.Figure(go.Bar(x=intraday.index, y=volume, name="Volume"))
+        volume_fig.update_layout(height=190, title="Intraday volume", template=PLOTLY_TEMPLATE,
+                                 paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG, xaxis_title="Time", yaxis_title="Volume")
+        st.plotly_chart(volume_fig, use_container_width=True)
+
+        st.markdown("**Intraday reference levels**")
+        levels = pd.DataFrame([{
+            "Open": float(intraday["Open"].iloc[0]),
+            "High": float(intraday["High"].max()),
+            "Low": float(intraday["Low"].min()),
+            "Last": float(last["Close"]),
+            "VWAP": float(last["VWAP"]) if pd.notna(last["VWAP"]) else np.nan,
+            "EMA 9": float(last["EMA 9"]),
+            "EMA 20": float(last["EMA 20"])
+        }])
+        st.dataframe(levels, use_container_width=True, hide_index=True)
+        st.caption("EMA 9/20 show short-term trend context. VWAP is volume-weighted average price for the returned data window. RSI is a momentum indicator, not a standalone buy/sell signal. For 5-day lookbacks, VWAP and high/low cover the returned multi-session window, not just today's session.")
+        st.download_button("Download intraday data CSV", intraday.to_csv(), f"{selected_name.lower().replace(' ', '_')}_intraday.csv", "text/csv")
+
 
 
 @st.cache_data(ttl=900, show_spinner=False)
