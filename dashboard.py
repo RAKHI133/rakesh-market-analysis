@@ -309,7 +309,7 @@ with refresh_col:
 with status_col:
     st.caption(f"Last page refresh: {datetime.now(ZoneInfo('Asia/Kolkata')):%I:%M:%S %p IST} · Automatic refresh interval: 30 seconds")
 
-tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "⚡ Intraday toolkit", "🏦 FII / DII", "🛡️ Risk calculator", "📝 Paper journal", "🔗 Resources", "⭐ Watchlists", "💼 Portfolio", "🧠 AI Market Intelligence"])
+tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "⚡ Intraday toolkit", "🏦 FII / DII", "🛡️ Risk calculator", "📝 Paper journal", "🔗 Resources", "⭐ Watchlists", "💼 Portfolio"])
 
 with tabs[0]:
     st.subheader("Price charts")
@@ -754,83 +754,6 @@ with tabs[3]:
             st.dataframe(table.sort_values("Date", ascending=False), use_container_width=True, hide_index=True)
             st.download_button("Download FII/DII CSV", table.to_csv(index=False), "fii_dii_history.csv", "text/csv")
             st.caption("Each row represents one trading day. Values are in ₹ crore; weekends and market holidays are excluded. Showing the latest five available trading sessions.")
-
-with tabs[9]:
-    st.subheader("AI Market Intelligence")
-    st.caption("A transparent, rule-based market briefing built from the dashboard's latest available quotes and loaded NSE institutional-flow data. No paid AI API is required; signals are descriptive, not predictions.")
-    if st.button("Generate market briefing", key="generate_market_briefing"):
-        st.session_state["market_briefing_requested"] = True
-
-    if st.session_state.get("market_briefing_requested"):
-        nifty = quotes.get("NIFTY 50")
-        banknifty = quotes.get("NIFTY BANK")
-        sensex = quotes.get("SENSEX")
-        sp500 = quotes.get("S&P 500")
-        vix = quotes.get("INDIA VIX")
-        crude_frame = get_history("CL=F", "5d", "1d")
-        crude_change = None
-        if crude_frame is not None and len(crude_frame) >= 2:
-            crude_change = (float(crude_frame["Close"].iloc[-1]) / float(crude_frame["Close"].iloc[-2]) - 1) * 100
-
-        score = 0
-        observations = []
-        def add_index_signal(label, quote, weight=1):
-            nonlocal_dummy = None
-            global_score = 0
-            if quote:
-                pct = float(quote[2])
-                direction = "higher" if pct > 0 else ("lower" if pct < 0 else "flat")
-                observations.append(f"{label} is {direction} by {pct:+.2f}% versus its previous available session reference.")
-                return 1 if pct > 0 else (-1 if pct < 0 else 0)
-            observations.append(f"{label} quote is unavailable.")
-            return 0
-
-        score += add_index_signal("NIFTY 50", nifty, 2) * 2
-        score += add_index_signal("BANKNIFTY", banknifty, 1)
-        score += add_index_signal("SENSEX", sensex, 1)
-        score += add_index_signal("S&P 500", sp500, 1)
-        if vix:
-            observations.append(f"India VIX is {vix[0]:.2f} ({vix[2]:+.2f}% change); rising volatility can mean wider intraday swings.")
-            score += -1 if vix[2] > 3 else (1 if vix[2] < -3 else 0)
-        else:
-            observations.append("India VIX quote is unavailable.")
-        if crude_change is not None:
-            observations.append(f"WTI crude futures changed {crude_change:+.2f}% over the latest daily observations.")
-            score += -1 if crude_change > 2 else (1 if crude_change < -2 else 0)
-        else:
-            observations.append("WTI crude futures data is unavailable.")
-
-        flow_data = st.session_state.get("fii_dii_data")
-        if flow_data is not None and not flow_data.empty:
-            flow = flow_data.iloc[0]
-            observations.append(f"Latest NSE cash-market institutional flow ({flow.date_sort:%d %b %Y}): FII/FPI net ₹{flow.fii_net:,.0f} Cr; DII net ₹{flow.dii_net:,.0f} Cr.")
-            if flow.fii_net > 0:
-                score += 1
-            elif flow.fii_net < 0:
-                score -= 1
-            if flow.dii_net > 0:
-                score += 1
-            elif flow.dii_net < 0:
-                score -= 1
-        else:
-            observations.append("FII/DII flow has not been loaded in the FII / DII tab; load the official NSE data there to include institutional flows.")
-
-        if score >= 3:
-            stance, explanation = "Positive bias", "More tracked inputs are supportive than negative."
-        elif score <= -3:
-            stance, explanation = "Cautious / negative bias", "More tracked inputs are negative than supportive."
-        else:
-            stance, explanation = "Mixed / neutral", "The tracked inputs are mixed or not strong enough for a directional bias."
-
-        st.metric("Rule-based market bias", stance, f"Composite score: {score:+d}")
-        st.write(explanation)
-        st.markdown("**Market observations**")
-        for item in observations:
-            st.markdown(f"- {item}")
-        st.caption(f"Briefing generated: {datetime.now(ZoneInfo('Asia/Kolkata')):%d %b %Y, %I:%M:%S %p IST}. Quotes may be delayed or stale. The score is a simple heuristic, not a trained AI model, a probability, or a buy/sell recommendation.")
-    else:
-        st.info("Select Generate market briefing to create a market snapshot from the latest available dashboard data.")
-    st.markdown("**Suggested workflow:** Load the latest NSE FII/DII data in the FII / DII tab, then return here and generate the briefing for an institutional-flow-aware summary.")
 
 with tabs[4]:
     st.subheader("Position sizing and risk")
