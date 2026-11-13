@@ -142,7 +142,7 @@ def get_history(symbol, period="6mo", interval="1d"):
         return pd.DataFrame()
 
 symbols = {
-    "NIFTY 50":"^NSEI", "NIFTY BANK":"^NSEBANK", "SENSEX":"^BSESN",
+    "NIFTY 50":"^NSEI", "SENSEX":"^BSESN", "NIFTY BANK":"^NSEBANK",
     "INDIA VIX":"^INDIAVIX", "S&P 500":"^GSPC", "NASDAQ":"^IXIC", "DOW JONES":"^DJI",
     "Gold (India equivalent)":"GC=F", "Silver (India equivalent)":"SI=F", "USD/INR":"INR=X"
 }
