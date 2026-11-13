@@ -290,7 +290,7 @@ def render_market_group(title, names, columns=4):
                 st.metric(name, "Unavailable")
 
 
-render_market_group('<span class="market-icon">🇮🇳</span> Indian markets', ["NIFTY 50", "NIFTY BANK", "SENSEX", "INDIA VIX"])
+render_market_group('<span class="market-icon">🇮🇳</span> Indian markets', ["NIFTY 50", "SENSEX", "NIFTY BANK", "INDIA VIX"])
 render_market_group('<span class="market-icon">🇺🇸</span> US market indices', ["S&P 500", "NASDAQ", "DOW JONES"], columns=3)
 render_market_group('<span class="market-icon">🥇</span> Precious metals · India equivalent', ["Gold (India equivalent)", "Silver (India equivalent)"], columns=2)
 render_market_group('<span class="market-icon">💱</span> Currency', ["USD/INR"], columns=1)
