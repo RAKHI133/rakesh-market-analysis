@@ -144,13 +144,13 @@ def get_history(symbol, period="6mo", interval="1d"):
 symbols = {
     "NIFTY 50":"^NSEI", "SENSEX":"^BSESN", "NIFTY BANK":"^NSEBANK",
     "INDIA VIX":"^INDIAVIX", "S&P 500":"^GSPC", "NASDAQ":"^IXIC", "DOW JONES":"^DJI",
-    "Gold (India equivalent)":"GC=F", "Silver (India equivalent)":"SI=F", "USD/INR":"INR=X"
+    "Gold 22K (indicative)":"GC=F", "Silver 999 (indicative)":"SI=F", "USD/INR":"INR=X"
 }
 # Values are displayed in their native market convention. Index values are points, not currency.
 QUOTE_FORMAT = {
     "NIFTY 50": ("", "pts"), "NIFTY BANK": ("", "pts"), "SENSEX": ("", "pts"),
     "INDIA VIX": ("", ""), "S&P 500": ("", "pts"), "NASDAQ": ("", "pts"), "DOW JONES": ("", "pts"),
-    "Gold (India equivalent)": ("₹", "/gram"), "Silver (India equivalent)": ("₹", "/gram"),
+    "Gold 22K (indicative)": ("₹", "/gram"), "Silver 999 (indicative)": ("₹", "/gram"),
     "USD/INR": ("₹", "per USD"),
 }
 
@@ -183,16 +183,22 @@ def get_market_quotes():
                     quotes[name] = None
             except Exception:
                 quotes[name] = None
-        # Convert COMEX USD/troy-ounce prices into indicative INR per gram.
-        # This is an India-currency equivalent, not a domestic MCX/retail bullion quote.
+        # Convert COMEX USD/troy-ounce futures into indicative INR per gram.
+        # Gold is adjusted to 22K (22/24 purity); silver is shown as 999 fine.
+        # This is a global spot/futures-derived estimate, not a domestic jeweller/MCX quote.
         fx = quotes.get("USD/INR")
         if fx and fx[0] > 0:
             grams_per_troy_ounce = 31.1034768
-            for metal in ("Gold (India equivalent)", "Silver (India equivalent)"):
+            metal_specs = {
+                "Gold 22K (indicative)": 22 / 24,
+                "Silver 999 (indicative)": 0.999,
+            }
+            for metal, purity in metal_specs.items():
                 q = quotes.get(metal)
                 if q:
-                    latest_inr_g = q[0] * fx[0] / grams_per_troy_ounce
-                    change_inr_g = q[1] * fx[0] / grams_per_troy_ounce
+                    factor = fx[0] * purity / grams_per_troy_ounce
+                    latest_inr_g = q[0] * factor
+                    change_inr_g = q[1] * factor
                     quotes[metal] = (latest_inr_g, change_inr_g, q[2])
         return quotes
     except Exception:
@@ -292,9 +298,9 @@ def render_market_group(title, names, columns=4):
 
 render_market_group('<span class="market-icon">🇮🇳</span> Indian markets', ["NIFTY 50", "SENSEX", "NIFTY BANK", "INDIA VIX"])
 render_market_group('<span class="market-icon">🇺🇸</span> US market indices', ["S&P 500", "NASDAQ", "DOW JONES"], columns=3)
-render_market_group('<span class="market-icon">🥇</span> Precious metals · India equivalent', ["Gold (India equivalent)", "Silver (India equivalent)"], columns=2)
+render_market_group('<span class="market-icon">🥇</span> Precious metals · indicative INR per gram', ["Gold 22K (indicative)", "Silver 999 (indicative)"], columns=2)
 render_market_group('<span class="market-icon">💱</span> Currency', ["USD/INR"], columns=1)
-st.caption("Gold and silver are converted to indicative Indian rupees per gram from COMEX USD/troy-ounce futures using the USD/INR rate. These are not verified domestic spot/MCX prices and exclude Indian local premiums, import duty, GST and jeweller making charges. Yahoo Finance data may be delayed, stale or unavailable.")
+st.caption("Gold 22K is estimated from COMEX gold futures × USD/INR × 22/24 purity; silver is estimated at 999 fineness from COMEX silver futures. Values are indicative global-market conversions, not verified Indian IBJA/MCX/jeweller rates. They exclude local premiums, import duty, GST and making charges. Yahoo Finance supplies 5-minute interval data where available; the dashboard polls/cache-refreshes about every 30 seconds, not every second. The displayed refresh clock does not mean the underlying market quote changes every second.")
 refresh_col, status_col = st.columns([1, 4])
 with refresh_col:
     if st.button("↻ Refresh data now", key="clear_market_data", use_container_width=True):
