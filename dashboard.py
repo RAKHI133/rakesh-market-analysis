@@ -492,14 +492,15 @@ with tabs[0]:
 
 with tabs[1]:
     st.subheader("Technical scanner")
-    st.markdown('<div class="section-note">Compare selected symbols using the existing SMA and RSI checks.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-note">Scan a wider basket of Indian large-cap stocks across banking, IT, energy, pharma, auto, FMCG, industrials and other sectors using SMA and RSI checks.</div>', unsafe_allow_html=True)
     scanner_presets = {
-        "Indian large caps": "RELIANCE.NS,HDFCBANK.NS,ICICIBANK.NS,INFY.NS,TCS.NS,SBIN.NS,ITC.NS,LT.NS",
+        "Indian large caps · Core": "RELIANCE.NS,HDFCBANK.NS,ICICIBANK.NS,INFY.NS,TCS.NS,SBIN.NS,ITC.NS,LT.NS,AXISBANK.NS,KOTAKBANK.NS,BAJFINANCE.NS,BHARTIARTL.NS,HINDUNILVR.NS,ASIANPAINT.NS,MARUTI.NS,SUNPHARMA.NS,TITAN.NS,ULTRACEMCO.NS,NTPC.NS,POWERGRID.NS",
+        "Indian large caps · Expanded": "RELIANCE.NS,HDFCBANK.NS,ICICIBANK.NS,INFY.NS,TCS.NS,SBIN.NS,ITC.NS,LT.NS,AXISBANK.NS,KOTAKBANK.NS,BAJFINANCE.NS,BHARTIARTL.NS,HINDUNILVR.NS,ASIANPAINT.NS,MARUTI.NS,SUNPHARMA.NS,TITAN.NS,ULTRACEMCO.NS,NTPC.NS,POWERGRID.NS,ADANIENT.NS,ADANIPORTS.NS,COALINDIA.NS,ONGC.NS,TATASTEEL.NS,JSWSTEEL.NS,GRASIM.NS,TECHM.NS,HCLTECH.NS,WIPRO.NS,DRREDDY.NS,CIPLA.NS,DIVISLAB.NS,APOLLOHOSP.NS,MAXHEALTH.NS,SBILIFE.NS,ICICIGI.NS,BAJAJFINSV.NS,SHRIRAMFIN.NS,CHOLAFIN.NS,M&M.NS,TATAMOTORS.NS,EICHERMOT.NS,HEROMOTOCO.NS,TVSMOTOR.NS,INDIGO.NS,DMART.NS,TRENT.NS,TATACONSUM.NS,BRITANNIA.NS,VBL.NS,PIDILITIND.NS,HAVELLS.NS,POLYCAB.NS,BEL.NS,HAL.NS,DLF.NS,INDHOTEL.NS,IOC.NS,GAIL.NS,PFC.NS,RECLTD.NS",
         "Custom symbols": ""
     }
     scanner_preset = st.radio("Watchlist preset", list(scanner_presets), horizontal=True)
     raw = st.text_input("Yahoo symbols, comma-separated", scanner_presets[scanner_preset], key="scanner_symbols_" + scanner_preset)
-    st.caption("Use Yahoo Finance ticker format. Indian equities usually end in .NS or .BO; US stocks use tickers such as AAPL and NVDA.")
+    st.caption("The expanded preset covers 60+ Indian-listed large-cap names across sectors. Symbols use Yahoo Finance format (.NS). You can edit the list or enter your own symbols. Scanning a larger basket may take longer; data can be delayed or unavailable.")
     if st.button("Run scanner"):
         rows = []
         for symbol in [x.strip().upper() for x in raw.split(",") if x.strip()]:
