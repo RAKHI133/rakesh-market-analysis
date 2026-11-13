@@ -309,7 +309,7 @@ with refresh_col:
 with status_col:
     st.caption(f"Last page refresh: {datetime.now(ZoneInfo('Asia/Kolkata')):%I:%M:%S %p IST} · Automatic refresh interval: 30 seconds")
 
-tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "⚡ Intraday toolkit", "🏦 FII / DII", "🧠 AI Market Intelligence", "🛡️ Risk calculator", "📝 Paper journal", "🔗 Resources", "⭐ Watchlists", "💼 Portfolio"])
+tabs = st.tabs(["📊 Charts", "🔎 Stock scanner", "⚡ Intraday toolkit", "🏦 FII / DII", "🛡️ Risk calculator", "📝 Paper journal", "🔗 Resources", "⭐ Watchlists", "💼 Portfolio", "🧠 AI Market Intelligence"])
 
 with tabs[0]:
     st.subheader("Price charts")
@@ -755,7 +755,7 @@ with tabs[3]:
             st.download_button("Download FII/DII CSV", table.to_csv(index=False), "fii_dii_history.csv", "text/csv")
             st.caption("Each row represents one trading day. Values are in ₹ crore; weekends and market holidays are excluded. Showing the latest five available trading sessions.")
 
-with tabs[4]:
+with tabs[9]:
     st.subheader("AI Market Intelligence")
     st.caption("A transparent, rule-based market briefing built from the dashboard's latest available quotes and loaded NSE institutional-flow data. No paid AI API is required; signals are descriptive, not predictions.")
     if st.button("Generate market briefing", key="generate_market_briefing"):
@@ -832,7 +832,7 @@ with tabs[4]:
         st.info("Select Generate market briefing to create a market snapshot from the latest available dashboard data.")
     st.markdown("**Suggested workflow:** Load the latest NSE FII/DII data in the FII / DII tab, then return here and generate the briefing for an institutional-flow-aware summary.")
 
-with tabs[5]:
+with tabs[4]:
     st.subheader("Position sizing and risk")
     st.markdown('<div class="section-note">Estimate position size from capital, stop distance and chosen risk.</div>', unsafe_allow_html=True)
     a,b = st.columns(2)
@@ -854,7 +854,7 @@ with tabs[5]:
         st.metric("Reward / risk", f"1 : {abs(target-entry)/unit_risk:.2f}")
     else: st.warning("Enter a positive entry and a different positive stop.")
 
-with tabs[6]:
+with tabs[5]:
     st.subheader("Paper trading journal")
     st.caption("Journal is saved on the hosting server's local disk and may not persist reliably across app restarts or redeployments. Download backups.")
     file = Path("paper_trades.csv")
@@ -886,7 +886,7 @@ with tabs[6]:
         st.dataframe(view,use_container_width=True,hide_index=True)
         st.download_button("Download paper journal CSV",view.to_csv(index=False),"paper_trades_backup.csv","text/csv")
 
-with tabs[7]:
+with tabs[6]:
     st.subheader("Official resources")
     st.caption("Curated links to Indian exchanges, regulators, government departments and financial-market institutions. These links open official websites; they do not automatically provide live data to this dashboard.")
     resource_groups = {
@@ -958,7 +958,7 @@ with tabs[7]:
                     st.markdown(f"- **[{label}]({url})**")
     st.caption(f"{sum(len(items) for items in resource_groups.values())} official resource links across {len(resource_groups)} categories.")
     st.markdown("**Important:** These are links to official institutional websites, not guaranteed live-data feeds or APIs. No broker connection, credentials, or order execution. Options payoff uses manual inputs. Verify prices, expiry dates, lot sizes, and charges with official exchange/broker sources before trading.")
-with tabs[8]:
+with tabs[7]:
     st.subheader("⭐ Favourite stocks & watchlists")
     st.markdown('<div class="section-note">Keep your preferred Indian and US symbols together and review their latest available quotes.</div>', unsafe_allow_html=True)
 
@@ -1109,7 +1109,7 @@ with tabs[8]:
             st.caption("Keep at least one watchlist. You can remove all its symbols instead.")
 
 # ---------- Portfolio analytics: session holdings and CSV backup ----------
-with tabs[9]:
+with tabs[8]:
     st.subheader("Portfolio analytics")
     st.caption("Manually entered holdings valued using available Yahoo Finance quotes. Not connected to a broker.")
     columns = ["Symbol", "Quantity", "Average Cost"]
