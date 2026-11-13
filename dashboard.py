@@ -555,7 +555,7 @@ with tabs[2]:
         except Exception:
             return pd.DataFrame()
 
-    with st.spinner("Loading intraday candles..."):
+    with st.spinner("Loading intraday price data..."):
         intraday = get_intraday_history(ticker, period, interval)
 
     if intraday.empty:
@@ -580,17 +580,31 @@ with tabs[2]:
         m3.metric("Session low", f"{intraday['Low'].min():,.2f}")
         m4.metric("RSI (14)", f"{last['RSI 14']:.1f}" if pd.notna(last["RSI 14"]) else "—")
 
-        candle = go.Figure()
-        candle.add_trace(go.Candlestick(x=intraday.index, open=intraday["Open"], high=intraday["High"],
-                                        low=intraday["Low"], close=intraday["Close"], name="Price"))
-        candle.add_trace(go.Scatter(x=intraday.index, y=intraday["EMA 9"], name="EMA 9", line=dict(width=1.4)))
-        candle.add_trace(go.Scatter(x=intraday.index, y=intraday["EMA 20"], name="EMA 20", line=dict(width=1.4)))
+        price_fig = go.Figure()
+        price_fig.add_trace(go.Scatter(
+            x=intraday.index, y=intraday["Close"], name="Price",
+            mode="lines", line=dict(width=2.2)
+        ))
+        price_fig.add_trace(go.Scatter(
+            x=intraday.index, y=intraday["EMA 9"], name="EMA 9",
+            mode="lines", line=dict(width=1.4)
+        ))
+        price_fig.add_trace(go.Scatter(
+            x=intraday.index, y=intraday["EMA 20"], name="EMA 20",
+            mode="lines", line=dict(width=1.4)
+        ))
         if intraday["VWAP"].notna().any():
-            candle.add_trace(go.Scatter(x=intraday.index, y=intraday["VWAP"], name="VWAP", line=dict(width=1.5, dash="dot")))
-        candle.update_layout(height=520, xaxis_title="Time", yaxis_title="Price",
-                             template=PLOTLY_TEMPLATE, paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG,
-                             xaxis_rangeslider_visible=False, legend_orientation="h")
-        st.plotly_chart(candle, use_container_width=True)
+            price_fig.add_trace(go.Scatter(
+                x=intraday.index, y=intraday["VWAP"], name="VWAP",
+                mode="lines", line=dict(width=1.5, dash="dot")
+            ))
+        price_fig.update_layout(
+            height=520, title="Intraday price line",
+            xaxis_title="Time", yaxis_title="Price",
+            template=PLOTLY_TEMPLATE, paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG,
+            legend_orientation="h"
+        )
+        st.plotly_chart(price_fig, use_container_width=True)
 
         volume_fig = go.Figure(go.Bar(x=intraday.index, y=volume, name="Volume"))
         volume_fig.update_layout(height=190, title="Intraday volume", template=PLOTLY_TEMPLATE,
