@@ -35,11 +35,9 @@ if maintenance_mode:
 
 st_autorefresh(interval=30_000, key="market_refresh")
 
-# ---------- Theme switch: compact control at the top-right ----------
-theme_spacer, theme_control = st.columns([8, 2])
-with theme_control:
-    is_day_theme = st.toggle("☀️ Day  /  🌙 Night", value=False, key="dashboard_theme")
-PLOTLY_TEMPLATE = "plotly_white" if is_day_theme else "plotly_dark"
+# ---------- Fixed dark theme ----------
+is_day_theme = False
+PLOTLY_TEMPLATE = "plotly_dark"
 PLOT_BG = "#ffffff" if is_day_theme else "#101827"
 
 # ---------- Full dashboard theme tokens ----------
@@ -81,6 +79,7 @@ st.markdown(f"""
   .hero-title {{ color:{hero_title}; font-size:1.55rem; font-weight:750; margin:.2rem 0; }}
   .hero-sub {{ color:{hero_sub}; font-size:.9rem; }}
   .market-heading {{ color:{text_color}; font-size:1rem; font-weight:700; margin:.85rem 0 .45rem; }}
+  .market-icon {{ font-size:.78rem; line-height:1; vertical-align:middle; display:inline-block; }}
   [data-testid="stTextInput"] input, [data-testid="stNumberInput"] input, [data-testid="stDateInput"] input, [data-testid="stTimeInput"] input, [data-testid="stTextArea"] textarea, [data-testid="stSelectbox"] [data-baseweb="select"] > div, [data-testid="stMultiSelect"] [data-baseweb="select"] > div {{ background: {input_bg} !important; color: {text_color} !important; border-color: {border_color} !important; }}
   [data-baseweb="popover"], [data-baseweb="menu"], [role="listbox"], [data-baseweb="select"] [role="option"] {{ background: {surface_bg} !important; color: {text_color} !important; }}
   [data-baseweb="select"] [role="option"]:hover {{ background: {hover_bg} !important; }}
@@ -291,10 +290,10 @@ def render_market_group(title, names, columns=4):
                 st.metric(name, "Unavailable")
 
 
-render_market_group("🇮🇳 Indian markets", ["NIFTY 50", "NIFTY BANK", "SENSEX", "INDIA VIX"])
-render_market_group("🇺🇸 US market indices", ["S&P 500", "NASDAQ", "DOW JONES"], columns=3)
-render_market_group("🥇 Precious metals · India equivalent", ["Gold (India equivalent)", "Silver (India equivalent)"], columns=2)
-render_market_group("💱 Currency", ["USD/INR"], columns=1)
+render_market_group('<span class="market-icon">🇮🇳</span> Indian markets', ["NIFTY 50", "NIFTY BANK", "SENSEX", "INDIA VIX"])
+render_market_group('<span class="market-icon">🇺🇸</span> US market indices', ["S&P 500", "NASDAQ", "DOW JONES"], columns=3)
+render_market_group('<span class="market-icon">🥇</span> Precious metals · India equivalent', ["Gold (India equivalent)", "Silver (India equivalent)"], columns=2)
+render_market_group('<span class="market-icon">💱</span> Currency', ["USD/INR"], columns=1)
 st.caption("Gold and silver are converted to indicative Indian rupees per gram from COMEX USD/troy-ounce futures using the USD/INR rate. These are not verified domestic spot/MCX prices and exclude Indian local premiums, import duty, GST and jeweller making charges. Yahoo Finance data may be delayed, stale or unavailable.")
 refresh_col, status_col = st.columns([1, 4])
 with refresh_col:
