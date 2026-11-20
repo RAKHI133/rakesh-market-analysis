@@ -144,14 +144,15 @@ def get_history(symbol, period="6mo", interval="1d"):
 symbols = {
     "NIFTY 50":"^NSEI", "SENSEX":"^BSESN", "NIFTY BANK":"^NSEBANK",
     "INDIA VIX":"^INDIAVIX", "S&P 500":"^GSPC", "NASDAQ":"^IXIC", "DOW JONES":"^DJI",
-    "Gold 22K (indicative)":"GC=F", "Silver 999 (indicative)":"SI=F", "USD/INR":"INR=X"
+    "Gold 22K (indicative)":"GC=F", "Silver 999 (indicative)":"SI=F", "USD/INR":"INR=X",
+    "Jio Financial Services":"JIOFIN.NS"
 }
 # Values are displayed in their native market convention. Index values are points, not currency.
 QUOTE_FORMAT = {
     "NIFTY 50": ("", "pts"), "NIFTY BANK": ("", "pts"), "SENSEX": ("", "pts"),
     "INDIA VIX": ("", ""), "S&P 500": ("", "pts"), "NASDAQ": ("", "pts"), "DOW JONES": ("", "pts"),
     "Gold 22K (indicative)": ("₹", "/gram"), "Silver 999 (indicative)": ("₹", "/gram"),
-    "USD/INR": ("₹", "per USD"),
+    "USD/INR": ("₹", "per USD"), "Jio Financial Services": ("₹", ""),
 }
 
 @st.cache_data(ttl=25, show_spinner=False)
@@ -300,6 +301,7 @@ render_market_group('<span class="market-icon">🇮🇳</span> Indian markets', 
 render_market_group('<span class="market-icon">🇺🇸</span> US market indices', ["S&P 500", "NASDAQ", "DOW JONES"], columns=3)
 render_market_group('<span class="market-icon">🥇</span> Precious metals · indicative INR per gram', ["Gold 22K (indicative)", "Silver 999 (indicative)"], columns=2)
 render_market_group('<span class="market-icon">💱</span> Currency', ["USD/INR"], columns=1)
+render_market_group('<span class="market-icon">📈</span> Featured Indian stock', ["Jio Financial Services"], columns=1)
 st.caption("Gold 22K is estimated from COMEX gold futures × USD/INR × 22/24 purity; silver is estimated at 999 fineness from COMEX silver futures. Values are indicative global-market conversions, not verified Indian IBJA/MCX/jeweller rates. They exclude local premiums, import duty, GST and making charges. Yahoo Finance supplies 5-minute interval data where available; the dashboard polls/cache-refreshes about every 30 seconds, not every second. The displayed refresh clock does not mean the underlying market quote changes every second.")
 refresh_col, status_col = st.columns([1, 4])
 with refresh_col:
@@ -319,6 +321,7 @@ with tabs[0]:
         "NIFTY 50":"^NSEI", "NIFTY BANK":"^NSEBANK", "SENSEX":"^BSESN",
         # Indian equities
         "RELIANCE · Reliance Industries":"RELIANCE.NS",
+        "JIOFIN · Jio Financial Services":"JIOFIN.NS",
         "HDFCBANK · HDFC Bank":"HDFCBANK.NS",
         "ICICIBANK · ICICI Bank":"ICICIBANK.NS",
         "INFY · Infosys":"INFY.NS", "TCS · Tata Consultancy Services":"TCS.NS",
